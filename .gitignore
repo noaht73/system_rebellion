@@ -43,4 +43,10 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Database
+system_rebellion.db
+*.sqlite3
+
+# Backend
 backend/system_rebellion.db
