@@ -86,69 +86,49 @@ const CPUMetric: React.FC<CPUMetricProps> = ({
     );
   }
 
-  // Extract CPU usage from the metric - handle multiple possible field names
-  // The backend might send data with different field names
-  const cpuUsage = 
-    currentMetric?.usage_percent || // Original field name
-    currentMetric?.cpu_usage || // Transformed field name
-    currentMetric?.overall_usage || // Another possible field name
-    currentMetric?.cpu_percent || // Another possible field name
-    (currentMetric?.cpu && currentMetric.cpu.usage_percent) || // Nested structure
-    0; // Default to 0 if no data
+  // Extract CPU usage from the metric - use the correct field name from new backend
+  const cpuUsage = currentMetric?.usage_percent || 0;
 
-  // Extract CPU cores data with fallbacks
-  const cpuCores = 
-    (currentMetric?.cores) || 
-    (currentMetric?.cpu && currentMetric.cpu.cores) || 
-    [];
+  // Extract CPU cores data - cores is now an array of per-core percentages
+  const cpuCores = currentMetric?.cores || [];
     
-  // Extract top processes data for logging
-  const processesForLogging = 
-    currentMetric?.top_processes || 
-    (currentMetric?.cpu && currentMetric.cpu.top_processes) || 
-    [];
+  // Extract top processes data
+  const topProcesses = currentMetric?.top_processes || [];
 
-  // Debug logging for detailed data inspection
-  console.log('🧪 DETAILED CPU DATA INSPECTION:');
-  console.log('🧪 Current CPU metric data (full object):', currentMetric);
-  console.log('🧪 Object keys:', Object.keys(currentMetric || {}));
-  console.log('🧪 usage_percent:', currentMetric?.usage_percent);
-  console.log('🧪 cpu_usage:', currentMetric?.cpu_usage);
-  console.log('🧪 overall_usage:', currentMetric?.overall_usage);
-  console.log('🧪 cpu_percent:', currentMetric?.cpu_percent);
-  console.log('🧪 cores:', cpuCores);
-  console.log('🧪 top_processes:', processesForLogging);
-  console.log('🧪 cpu property:', currentMetric?.cpu);
-
-  console.log('🧪 Final cpuUsage value used:', cpuUsage);
-
-  // Extract CPU details
+  // Extract CPU details for thermal/details tab
   const cpuDetails: CPUDetails = {
     cores: {
-      logical: currentMetric.logical_cores || 0,
-      physical: currentMetric.physical_cores || 0
+      logical: currentMetric?.logical_cores || 0,
+      physical: currentMetric?.physical_cores || 0,
     },
     frequency: {
-      current: currentMetric.frequency_mhz || 0,
-      min: 0, // We don't have min frequency data from backend
-      max: 0  // We don't have max frequency data from backend
+      current: currentMetric?.frequency_mhz || 0,
+      min: currentMetric?.frequency_details?.min || 0,
+      max: currentMetric?.frequency_details?.max || 0,
     },
-    temperature: currentMetric.temperature || 0,
-    per_core_usage: Array.isArray(currentMetric.cores) 
-      ? currentMetric.cores.map((c: any) => c.usage_percent || c.usage || 0)
-      : []
+    temperature: currentMetric?.temperature || 0,
+    per_core_usage: cpuCores,
+    physical_cores: currentMetric?.physical_cores || 0,
   };
-  
+
+  // Debug logging for the new data structure
+  console.log('🔧 CPU Component - New backend data structure:');
+  console.log('🔧 usage_percent:', currentMetric?.usage_percent);
+  console.log('🔧 physical_cores:', currentMetric?.physical_cores);
+  console.log('🔧 logical_cores:', currentMetric?.logical_cores);
+  console.log('🔧 frequency_mhz:', currentMetric?.frequency_mhz);
+  console.log('🔧 temperature:', currentMetric?.temperature);
+  console.log('🔧 cores array length:', cpuCores.length);
+  console.log('🔧 top_processes length:', topProcesses.length);
+
   // Extract CPU processes
-  const topProcesses: CPUProcess[] = Array.isArray(currentMetric.top_processes)
-    ? currentMetric.top_processes.map((p: { name: any; pid: any; cpu_percent: any; usage_percent: any; memory_percent: any; }) => ({
-        name: p.name || 'Unknown',
-        pid: p.pid || 0,
-        cpu_percent: p.cpu_percent || p.usage_percent || 0,
-        memory_percent: p.memory_percent || 0
-      }))
-    : [];
-  
+  const cpuProcesses: CPUProcess[] = topProcesses.map((p: any) => ({
+    name: p.name || 'Unknown',
+    pid: p.pid || 0,
+    cpu_percent: p.cpu_percent || 0,
+    memory_percent: p.memory_percent || 0
+  }));
+
   // Chart data
   const chartData = historicalMetrics.map((metric: any) => ({
     timestamp: metric.timestamp,
@@ -263,22 +243,25 @@ const CPUMetric: React.FC<CPUMetricProps> = ({
           min: 0,
           max: cpuDetails.frequency.max
         },
-        processes: topProcesses.map(p => ({
-          ...p,
+        processes: cpuProcesses.map((p: CPUProcess) => ({
           user: 'system',
           command: p.name,
-          usage_percent: p.cpu_percent
+          usage_percent: p.cpu_percent,
+          pid: p.pid,
+          memory_percent: p.memory_percent
         })),
-        top_processes: topProcesses.map(p => ({
-          ...p,
+        top_processes: cpuProcesses.map((p: CPUProcess) => ({
           user: 'system',
           command: p.name,
+          usage_percent: p.cpu_percent,
+          pid: p.pid,
+          memory_percent: p.memory_percent
         })),
         core_count: cpuDetails.cores.physical,
         logical_cores: cpuDetails.cores.logical,
         usage_percent: cpuUsage,
         overall_usage: cpuUsage,
-        process_count: topProcesses.length,
+        process_count: cpuProcesses.length,
         thread_count: cpuDetails.cores.logical,
         physical_cores: cpuDetails.cores.physical,
         model_name: currentMetric.cpu_model || 'System CPU',
@@ -338,8 +321,8 @@ const CPUMetric: React.FC<CPUMetricProps> = ({
         <div className="processes-content">
           <h3>Top CPU Processes</h3>
           <div className="process-list">
-            {topProcesses.length > 0 ? (
-              topProcesses.map((process: CPUProcess, index: number) => (
+            {cpuProcesses.length > 0 ? (
+              cpuProcesses.map((process: CPUProcess, index: number) => (
                 <Card key={index} className="process-card">
                   <div className="process-name">{process.name}</div>
                   <div className="process-usage">{process.cpu_percent.toFixed(1)}%</div>
@@ -360,7 +343,7 @@ const CPUMetric: React.FC<CPUMetricProps> = ({
     // Otherwise use the component style processes tab
     return (
       <CPUProcessesTab 
-        processes={topProcesses.map(p => ({
+        processes={cpuProcesses.map((p: CPUProcess) => ({
           ...p,
           user: 'system',
           command: p.name,

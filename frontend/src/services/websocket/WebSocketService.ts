@@ -229,84 +229,55 @@ export class WebSocketService {
   private setupEventListeners(): void {
     if (!this.socket) return;
     
-    // Connection opened - send auth immediately
+    // Connection opened - wait for connection_established message before auth
     this.socket.onopen = async () => {
-      console.log('🦔 WebSocket connected! Authenticating...');
+      console.log('🦔 WebSocket connected! Waiting for connection_established message...');
       this.updateConnectionStatus('connected');
-      
-      try {
-        // Get fresh token
-        const token = await authService.getCurrentToken();
-        if (!token) {
-          console.error('🦔 No authentication token available!');
-          this.socket?.close();
-          return;
-        }
-        
-        // Send authentication message
-        this.socket?.send(JSON.stringify({
-          type: 'auth',
-          token: token
-        }));
-        
-        console.log('🦔 Authentication message sent!');
-        
-      } catch (error) {
-        console.error('🦔 Failed to send auth:', error);
-        this.socket?.close();
-      }
     };
     
-    // Handle messages
+    // Handle messages from server
     this.socket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('🦔 Message received:', message.type);
+        console.log('🦔 Received message:', message.type, message);
         
-        // Handle authentication responses
-        if (message.type === 'auth_success') {
-          console.log('🦔 Authentication successful! Jolly good!');
-          this.isAuthenticated = true;
-          this.circuitBreaker.recordSuccess();
-          this.reconnectAttempts = 0;
-          this.startHeartbeat();
-          return;
-        }
-        
-        if (message.type === 'auth_failed') {
-          console.error('🦔 Authentication failed:', message.message);
-          this.isAuthenticated = false;
-          this.socket?.close();
-          return;
-        }
-        
-        if (message.type === 'error') {
-          console.error('🦔 Server error:', message.message);
-          if (message.code === 'circuit_open') {
-            // Don't reconnect if server circuit breaker is open
+        switch (message.type) {
+          case 'connection_established':
+            console.log('🦔 Connection established! Sending authentication...');
+            this.handleConnectionEstablished();
+            break;
+            
+          case 'auth_success':
+            this.handleAuthSuccess();
+            break;
+            
+          case 'auth_failed':
+            console.error('🚨 Authentication failed:', message.message);
             this.circuitBreaker.recordFailure();
-          }
-          return;
+            this.socket?.close();
+            break;
+            
+          case 'metrics_update':
+            this.handleMetricsUpdate(message);
+            break;
+            
+          case 'system_info':
+            console.log('📊 System info received:', message.data);
+            break;
+            
+          case 'error':
+            console.error('🚨 Server error:', message.message);
+            break;
+            
+          case 'pong':
+            console.log('🏓 Pong received');
+            break;
+            
+          default:
+            console.log('🦔 Unknown message type:', message.type);
         }
-        
-        // Only process other messages if authenticated
-        if (!this.isAuthenticated) {
-          console.warn('🦔 Received message before authentication complete');
-          return;
-        }
-        
-        // Handle metrics updates
-        if (message.type === 'metrics_update') {
-          this.processMetricsUpdate(message);
-        } else if (message.type === 'pong') {
-          console.log('🦔 Heartbeat acknowledged');
-        } else if (message.type === 'rate_limit') {
-          console.warn('🦔 Rate limited:', message.message);
-          this.rateLimiter.recordRejection();
-        }
-        
       } catch (error) {
-        console.error('🦔 Error processing message:', error);
+        console.error('🚨 Error parsing WebSocket message:', error);
       }
     };
     
@@ -334,46 +305,122 @@ export class WebSocketService {
     };
   }
   
-  private processMetricsUpdate(message: any): void {
-    // Apply backpressure if needed
+  private handleConnectionEstablished(): void {
+    // Get fresh token
+    console.log('🔍 Getting authentication token from authService...');
+    authService.getCurrentToken().then(token => {
+      console.log('🔍 Token received from authService:', token ? `${token.substring(0, 20)}...` : 'null/undefined');
+      
+      if (!token) {
+        console.error('🦔 No authentication token available!');
+        this.socket?.close();
+        return;
+      }
+      
+      // Get the user from localStorage as a backup
+      const username = localStorage.getItem('username');
+      
+      // Create auth message with token and user info
+      const authMessage = {
+        type: 'auth',
+        token: token,
+        username: username
+      };
+      
+      console.log('🔍 Sending authentication message:', {
+        type: authMessage.type,
+        token: authMessage.token ? `${authMessage.token.substring(0, 20)}...` : 'null/undefined',
+        username: authMessage.username,
+        messageLength: JSON.stringify(authMessage).length
+      });
+      
+      // Send authentication message
+      this.socket?.send(JSON.stringify(authMessage));
+      
+      console.log('🦔 Authentication message sent!');
+    }).catch(error => {
+      console.error('🚨 Failed to send auth:', error);
+      this.socket?.close();
+    });
+  }
+  
+  private handleAuthSuccess(): void {
+    console.log('🦔 Authentication successful!');
+    this.isAuthenticated = true;
+    this.updateConnectionStatus('connected');
+    this.circuitBreaker.recordSuccess();
+    this.startHeartbeat(); // Start heartbeat after successful authentication
+  }
+  
+  private handleMetricsUpdate(message: any): void {
+    console.log('🔄 [WebSocketService] Processing metrics update:', message);
+    console.log('🔍 [WebSocketService] Message type:', typeof message);
+    console.log('🔍 [WebSocketService] Message keys:', Object.keys(message));
+    
     if (!this.backpressureHandler.canProcess()) {
-      console.warn('🦔 Backpressure activated, dropping message');
+      console.warn('🦔 [WebSocketService] Backpressure - dropping metrics update');
       return;
     }
     
-    // Transform the message to match frontend expectations
-    const metricsData = message.data;
+    // Get the metrics data from the message
+    // The backend sends a single message with all metrics nested under keys
+    const metricsData = message.data || message;
+    console.log('🔍 [WebSocketService] MetricsData keys:', Object.keys(metricsData));
     
-    // CPU metrics
+    // Enhanced debugging - log the metrics data structure
+    console.log('🔍 [WebSocketService] FULL METRICS DATA STRUCTURE:', JSON.stringify(metricsData, null, 2));
+    
+    // CPU metrics - the detailed CPU data is directly under the 'cpu' key
     if (metricsData.cpu) {
+      console.log('✅ [WebSocketService] Found CPU data:', metricsData.cpu);
+      console.log('🔍 [WebSocketService] CPU data structure:', JSON.stringify(metricsData.cpu, null, 2));
+      console.log('🚀 [WebSocketService] Dispatching cpu_metrics with data:', metricsData.cpu);
       this.onMessage?.({
         type: 'cpu_metrics',
         data: metricsData.cpu
       });
+    } else {
+      console.log('❌ [WebSocketService] No CPU data found in metricsData');
+      console.log('🔍 [WebSocketService] Available keys in metricsData:', Object.keys(metricsData));
     }
     
-    // Memory metrics
+    // Memory metrics - the detailed memory data is directly under the 'memory' key
     if (metricsData.memory) {
+      console.log('✅ [WebSocketService] Found Memory data:', metricsData.memory);
+      console.log('🔍 [WebSocketService] Memory data structure:', JSON.stringify(metricsData.memory, null, 2));
+      console.log('🚀 [WebSocketService] Dispatching memory_metrics with data:', metricsData.memory);
       this.onMessage?.({
         type: 'memory_metrics',
         data: metricsData.memory
       });
+    } else {
+      console.log('❌ [WebSocketService] No Memory data found in metricsData');
     }
     
-    // Disk metrics
+    // Disk metrics - the detailed disk data is directly under the 'disk' key
     if (metricsData.disk) {
+      console.log('✅ [WebSocketService] Found Disk data:', metricsData.disk);
+      console.log('🔍 [WebSocketService] Disk data structure:', JSON.stringify(metricsData.disk, null, 2));
+      console.log('🚀 [WebSocketService] Dispatching disk_metrics with data:', metricsData.disk);
       this.onMessage?.({
         type: 'disk_metrics',
         data: metricsData.disk
       });
+    } else {
+      console.log('❌ [WebSocketService] No Disk data found in metricsData');
     }
     
-    // Network metrics
+    // Network metrics - the detailed network data is directly under the 'network' key
     if (metricsData.network) {
+      console.log('✅ [WebSocketService] Found Network data:', metricsData.network);
+      console.log('🔍 [WebSocketService] Network data structure:', JSON.stringify(metricsData.network, null, 2));
+      console.log('🚀 [WebSocketService] Dispatching network_metrics with data:', metricsData.network);
       this.onMessage?.({
         type: 'network_metrics',
         data: metricsData.network
       });
+    } else {
+      console.log('❌ [WebSocketService] No Network data found in metricsData');
     }
     
     this.backpressureHandler.recordProcessed();
@@ -522,4 +569,3 @@ export const initWebSocket = (_dispatch: unknown): WebSocketService => {
 export const getWebSocketInstance = (): WebSocketService | null => {
   return wsInstance;
 };
-        

@@ -22,27 +22,28 @@ async def get_current_user_from_token(token: str) -> Optional[User]:
     """
     try:
         # Decode the JWT token
-        logger.info(f"Decoding WebSocket token: {token[:10]}...")
+        print(f"Decoding WebSocket token: {token[:10]}...")
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
+        
         # Extract the subject (username)
         username = cast(str, payload.get("sub"))
         if not username:
-            logger.error("Token missing 'sub' field")
+            print("Token missing 'sub' field")
             return None
-        logger.info(f"Token subject: {username}")
+        print(f"Token subject: {username}")
 
         # Get user from database
         async with AsyncSessionLocal() as db:  # type: ignore
             db_session: AsyncSession = db
-            logger.info(f"Looking up user: {username}")
+            print(f"Looking up user: {username}")
             stmt = select(User).where(User.username == username)  # type: ignore
             result = (await db_session.execute(stmt)).scalars()  # type: ignore
             user = result.first()  # type: ignore
                 
             if not user:
-                logger.error(f"User not found: {username}")
+                print(f"User not found: {username}")
                 return None
                 
         # Create a detached copy of the user object
@@ -53,14 +54,14 @@ async def get_current_user_from_token(token: str) -> Optional[User]:
             is_active=bool(user.is_active)
         )
         
-        logger.info(f"User authenticated successfully: {detached_user.username}")
+        print(f"User authenticated successfully: {detached_user.username}")
         return detached_user
                 
     except JWTError as e:
-        logger.error(f"JWT error in WebSocket: {str(e)}")
+        print(f"JWT error in WebSocket: {str(e)}")
         return None
     except Exception as e:
-        logger.error(f"Error authenticating WebSocket: {str(e)}")
+        print(f"Error authenticating WebSocket: {str(e)}")
         return None
 
 async def authenticate_websocket(websocket: WebSocket) -> Optional[User]:
@@ -78,40 +79,40 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[User]:
                 token = auth_header.split(" ")[1]
         
         if not token:
-            logger.warning("No token provided for WebSocket connection")
+            print("No token provided for WebSocket connection")
             try:
                 await websocket.send_json({
                     "type": "error",
                     "message": "No authentication token provided"
                 })
             except Exception as e:
-                logger.error(f"Failed to send error message: {str(e)}")
+                print(f"Failed to send error message: {str(e)}")
             finally:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return None
         
-        logger.debug(f"Authenticating WebSocket with token: {token[:10]}...")
+        print(f"Authenticating WebSocket with token: {token[:10]}...")
         
         # Validate token and get user
         user = await get_current_user_from_token(token)
         
         if not user:
-            logger.error("Invalid token for WebSocket connection")
+            print("Invalid token for WebSocket connection")
             try:
                 await websocket.send_json({
                     "type": "error",
                     "message": "Invalid or expired authentication token"
                 })
             except Exception as e:
-                logger.error(f"Failed to send error message: {str(e)}")
+                print(f"Failed to send error message: {str(e)}")
             finally:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return None
         
-        logger.info(f"WebSocket authenticated for user: {getattr(user, 'username')}")  # type: ignore
+        print(f"WebSocket authenticated for user: {getattr(user, 'username')}")  # type: ignore
         return user
         
     except Exception as e:
-        logger.error(f"WebSocket authentication error: {str(e)}")
+        print(f"WebSocket authentication error: {str(e)}")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return None

@@ -207,7 +207,7 @@ export enum AlertSeverity {
 export interface MetricAlert {
   id: string;
   metric_type: 'cpu' | 'memory' | 'disk' | 'network';
-  type: 'usage' | 'temperature' | 'memory' | 'disk' | 'network';
+  type: 'usage' | 'temperature' | 'memory' | 'disk' | 'network' | 'bandwidth' | 'connections';
   severity: AlertSeverity;
   threshold: number;
   current_value: number;

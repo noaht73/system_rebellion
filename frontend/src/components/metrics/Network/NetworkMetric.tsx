@@ -64,68 +64,130 @@ export const NetworkMetric: React.FC<NetworkMetricProps> = ({
     );
   }
 
-  // Extract network data from metrics
-  console.log('Current network metric data:', currentMetric);
+  // Extract network data from metrics - use the correct field names from new backend
+  console.log(' Network Component - New backend data structure:', currentMetric);
+  
+  const bytesSent = currentMetric.bytes_sent || 0;
+  const bytesRecv = currentMetric.bytes_recv || 0;
+  const packetsSent = currentMetric.packets_sent || 0;
+  const packetsRecv = currentMetric.packets_recv || 0;
+  const sentRate = currentMetric.sent_rate || 0;
+  const recvRate = currentMetric.recv_rate || 0;
+  const interfaces = currentMetric.interfaces || [];
+  const connections = currentMetric.connections || [];
+  const connectionStats = currentMetric.connection_stats || {};
+  const protocolStats = currentMetric.protocol_stats || {};
+  const interfaceStats = currentMetric.interface_stats || {};
+  const connectionQuality = currentMetric.connection_quality || {};
+  
+  // Debug logging for the new data structure
+  console.log(' Network Component - New backend data structure:');
+  console.log(' bytes_sent:', bytesSent);
+  console.log(' bytes_recv:', bytesRecv);
+  console.log(' sent_rate:', sentRate);
+  console.log(' recv_rate:', recvRate);
+  console.log(' interfaces length:', interfaces.length);
+  console.log(' connections length:', connections.length);
+  console.log(' connection_stats:', connectionStats);
+  console.log(' protocol_stats:', protocolStats);
   
   // Handle the new data structure from the backend
-  // The network metrics are now directly in the currentMetric object, not nested under 'network'
   const networkDetails: NetworkDetails = {
-    bytes_sent: 0, // These fields might not be directly available in the new structure
-    bytes_recv: 0,
-    packets_sent: 0,
-    packets_recv: 0,
-    rate_mbps: 0,
-    sent_rate_bps: 0,
-    recv_rate_bps: 0,
+    bytes_sent: bytesSent,
+    bytes_recv: bytesRecv,
+    packets_sent: packetsSent,
+    packets_recv: packetsRecv,
+    rate_mbps: (sentRate + recvRate) / (1024 * 1024), // Convert to MB/s
+    sent_rate_bps: sentRate,
+    recv_rate_bps: recvRate,
     io_stats: {
-      bytes_sent: 0,
-      bytes_recv: 0,
-      packets_sent: 0,
-      packets_recv: 0,
-      sent_rate: 0,
-      recv_rate: 0,
-      errors_in: 0,
+      bytes_sent: bytesSent,
+      bytes_recv: bytesRecv,
+      packets_sent: packetsSent,
+      packets_recv: packetsRecv,
+      sent_rate: sentRate,
+      recv_rate: recvRate,
+      errors_in: 0, // Would need to aggregate from interface_stats
       errors_out: 0,
       drops_in: 0,
       drops_out: 0
     },
-    interfaces: [],
-    protocol_stats: currentMetric.protocol_stats || {
+    interfaces: interfaces,
+    protocol_stats: {
       tcp: {
-        active: 0,
-        established: 0,
-        listening: 0
+        active: protocolStats.tcp || 0,
+        established: connectionStats.ESTABLISHED || 0,
+        listening: connectionStats.LISTEN || 0
       },
       udp: {
-        active: 0
+        active: protocolStats.udp || 0
       },
       http: {
-        connections: 0
+        connections: 0 // Not directly available
       },
       https: {
-        connections: 0
+        connections: 0 // Not directly available
       },
       dns: {
-        queries: 0
+        queries: 0 // Not directly available
       }
     },
-    // Add new fields from the updated structure
     connection_quality: {
-      average_latency: currentMetric.latency_ms || 0,
-      packet_loss_percent: currentMetric.packet_loss_percent || 0,
-      connection_stability: currentMetric.stability || 100,
-      jitter: currentMetric.jitter_ms || 0,
-      gateway_latency: currentMetric.gateway_latency || 0,
-      dns_latency: currentMetric.dns_latency || 0,
-      internet_latency: currentMetric.internet_latency || 0
+      average_latency: connectionQuality.latency || 0,
+      packet_loss_percent: connectionQuality.packet_loss || 0,
+      connection_stability: 100, // Default to good stability
+      jitter: connectionQuality.jitter || 0,
+      gateway_latency: 0, // Not available in current backend
+      dns_latency: 0, // Not available in current backend
+      internet_latency: 0 // Not available in current backend
     },
     protocol_breakdown: currentMetric.protocol_breakdown || {},
     top_bandwidth_processes: currentMetric.top_processes || []
   };
-  const networkReceiveRate = networkDetails.recv_rate_bps || 0;
-  const networkTransmitRate = networkDetails.sent_rate_bps || 0;
-  const totalNetworkRate = networkReceiveRate + networkTransmitRate;
-  
+
+  // Calculate network rates for display
+  const networkTransmitRate = sentRate;
+  const networkReceiveRate = recvRate;
+  const totalNetworkRate = networkTransmitRate + networkReceiveRate;
+
+  // Prepare historical data for area chart
+  const networkHistoryData = historicalMetrics.map(metric => ({
+    timestamp: new Date(metric.timestamp).getTime(),
+    receive: metric.recv_rate || 0,
+    transmit: metric.sent_rate || 0,
+    total: (metric.sent_rate || 0) + (metric.recv_rate || 0)
+  }));
+
+  // Process interfaces data
+  const networkInterfaces = interfaces.map((iface: any) => ({
+    name: iface.name || 'Unknown',
+    address: iface.address || '',
+    mac_address: iface.mac_address || '',
+    isup: iface.isup || false,
+    speed: iface.speed || 0,
+    mtu: iface.mtu || 0,
+    stats: interfaceStats[iface.name] || {
+      bytes_sent: 0,
+      bytes_recv: 0,
+      packets_sent: 0,
+      packets_recv: 0,
+      errin: 0,
+      errout: 0,
+      dropin: 0,
+      dropout: 0
+    }
+  }));
+
+  // Process connections data
+  const networkConnections = connections.map((conn: any) => ({
+    fd: conn.fd || null,
+    pid: conn.pid || null,
+    type: conn.type || 'unknown',
+    local_address: conn.local_address || '-',
+    remote_address: conn.remote_address || '-',
+    status: conn.status || 'UNKNOWN'
+  }));
+
   // Format bytes to human-readable format
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
@@ -152,33 +214,55 @@ export const NetworkMetric: React.FC<NetworkMetricProps> = ({
     return 'normal';
   };
 
-  // Prepare historical data for area chart
-  const networkHistoryData = historicalMetrics?.map(metric => ({
-    timestamp: new Date(metric.timestamp).getTime(),
-    receive: metric.network?.recv_rate_bps || 0,
-    transmit: metric.network?.sent_rate_bps || 0,
-    total: (metric.network?.recv_rate_bps || 0) + (metric.network?.sent_rate_bps || 0)
-  })) || [];
-
-  // Prepare network interfaces data with correct property mapping
-  const networkInterfaces = (networkDetails.interfaces || []).map(iface => ({
-    name: iface.name,
-    status: iface.isup ? 'Up' : 'Down',
-    ip_address: iface.address || 'Unknown',
-    mac_address: iface.mac_address || 'Unknown',
-    receive_rate: iface.bytes_recv || 0,
-    transmit_rate: iface.bytes_sent || 0
-  }));
-  
-  // Prepare network connections data
-  const networkConnections = networkDetails.protocol_stats?.tcp ? [
-    {
-      protocol: 'TCP',
-      active: networkDetails.protocol_stats.tcp.active,
-      listening: networkDetails.protocol_stats.tcp.listening || 0,
-      established: networkDetails.protocol_stats.tcp.established
-    }
-  ] : [];
+  // Prepare network data for component tabs
+  const networkData = {
+    overview: {
+      receiveRate: networkReceiveRate,
+      transmitRate: networkTransmitRate,
+      totalReceived: networkDetails.bytes_recv || 0,
+      totalTransmitted: networkDetails.bytes_sent || 0,
+      packetErrors: networkDetails.io_stats?.errors_in || 0,
+      packetDrops: networkDetails.io_stats?.drops_in || 0,
+      io_stats: networkDetails.io_stats || {
+        bytes_sent: networkDetails.bytes_sent || 0,
+        bytes_recv: networkDetails.bytes_recv || 0,
+        sent_rate: networkDetails.sent_rate_bps || 0,
+        recv_rate: networkDetails.recv_rate_bps || 0,
+        errors_in: 0,
+        errors_out: 0,
+        drops_in: 0,
+        drops_out: 0
+      },
+      connection_quality: networkDetails.connection_quality || {
+        average_latency: 0,
+        packet_loss_percent: 0,
+        connection_stability: 100,
+        jitter: 0,
+        gateway_latency: 0,
+        dns_latency: 0,
+        internet_latency: 0
+      },
+      protocol_breakdown: networkDetails.protocol_breakdown || {
+        web: 30,
+        email: 10,
+        streaming: 25,
+        gaming: 15,
+        file_transfer: 10,
+        other: 10
+      },
+      protocol_stats: networkDetails.protocol_stats || {
+        tcp: { active: 0, established: 0 },
+        udp: { active: 0 },
+        http: { connections: 0 },
+        https: { connections: 0 },
+        dns: { queries: 0 }
+      },
+      top_bandwidth_processes: networkDetails.top_bandwidth_processes || []
+    },
+    interfaces: networkInterfaces,
+    connections: networkConnections,
+    history: networkHistoryData
+  };
 
   // If using dashboard mode, render the dashboard style
   if (dashboardMode) {
@@ -240,12 +324,12 @@ export const NetworkMetric: React.FC<NetworkMetricProps> = ({
                 {networkInterfaces.map((iface, index) => (
                   <div key={index} className="interface-card">
                     <div className="interface-name">{iface.name}</div>
-                    <div className="interface-status">{iface.status}</div>
+                    <div className="interface-status">{iface.isup ? 'Up' : 'Down'}</div>
                     <div className="interface-details">
-                      <span>IP: {iface.ip_address}</span>
+                      <span>IP: {iface.address}</span>
                       <span>MAC: {iface.mac_address}</span>
-                      <span>Download: {formatBytesPerSecond(iface.receive_rate || 0)}</span>
-                      <span>Upload: {formatBytesPerSecond(iface.transmit_rate || 0)}</span>
+                      <span>Download: {formatBytesPerSecond(iface.stats.bytes_recv || 0)}</span>
+                      <span>Upload: {formatBytesPerSecond(iface.stats.bytes_sent || 0)}</span>
                     </div>
                   </div>
                 ))}
@@ -256,56 +340,6 @@ export const NetworkMetric: React.FC<NetworkMetricProps> = ({
       </div>
     );
   }
-  
-  // Prepare network data for component tabs
-  const networkData = {
-    overview: {
-      receiveRate: networkReceiveRate,
-      transmitRate: networkTransmitRate,
-      totalReceived: networkDetails.bytes_recv || 0,
-      totalTransmitted: networkDetails.bytes_sent || 0,
-      packetErrors: networkDetails.io_stats?.errors_in || 0,
-      packetDrops: networkDetails.io_stats?.drops_in || 0,
-      io_stats: networkDetails.io_stats || {
-        bytes_sent: networkDetails.bytes_sent || 0,
-        bytes_recv: networkDetails.bytes_recv || 0,
-        sent_rate: networkDetails.sent_rate_bps || 0,
-        recv_rate: networkDetails.recv_rate_bps || 0,
-        errors_in: 0,
-        errors_out: 0,
-        drops_in: 0,
-        drops_out: 0
-      },
-      connection_quality: networkDetails.connection_quality || {
-        average_latency: 0,
-        packet_loss_percent: 0,
-        connection_stability: 100,
-        jitter: 0,
-        gateway_latency: 0,
-        dns_latency: 0,
-        internet_latency: 0
-      },
-      protocol_breakdown: networkDetails.protocol_breakdown || {
-        web: 30,
-        email: 10,
-        streaming: 25,
-        gaming: 15,
-        file_transfer: 10,
-        other: 10
-      },
-      protocol_stats: networkDetails.protocol_stats || {
-        tcp: { active: 0, established: 0 },
-        udp: { active: 0 },
-        http: { connections: 0 },
-        https: { connections: 0 },
-        dns: { queries: 0 }
-      },
-      top_bandwidth_processes: networkDetails.top_bandwidth_processes || []
-    },
-    interfaces: networkInterfaces,
-    connections: networkConnections,
-    history: networkHistoryData
-  };
   
   // Render compact version for dashboard if requested
   if (compact) {

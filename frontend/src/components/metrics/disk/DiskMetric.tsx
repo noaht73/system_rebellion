@@ -64,23 +64,38 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
     );
   }
 
-  // Extract disk data from metrics
-  console.log('Current disk metric data:', diskMetrics);
+  // Extract disk data from metrics - use the correct field names from new backend
+  console.log(' Disk Component - New backend data structure:', diskMetrics);
   
-  // Handle the new data structure from the backend
-  const diskUsage = diskMetrics?.usage_percent || 0;
+  const diskUsage = diskMetrics?.percent || 0;
+  const totalSpace = diskMetrics?.total || 0;
+  const usedSpace = diskMetrics?.used || 0;
+  const freeSpace = diskMetrics?.free || 0;
+  const readRate = diskMetrics?.read_rate || 0;
+  const writeRate = diskMetrics?.write_rate || 0;
+  const partitions = diskMetrics?.partitions || [];
+  
+  // Debug logging for the new data structure
+  console.log(' Disk Component - New backend data structure:');
+  console.log(' percent:', diskMetrics?.percent);
+  console.log(' total:', diskMetrics?.total);
+  console.log(' used:', diskMetrics?.used);
+  console.log(' free:', diskMetrics?.free);
+  console.log(' read_rate:', diskMetrics?.read_rate);
+  console.log(' write_rate:', diskMetrics?.write_rate);
+  console.log(' partitions length:', partitions.length);
   
   // Create RawDiskMetrics structure from available metrics
   const rawDiskMetrics: RawDiskMetrics = {
-    partitions: diskMetrics?.directories || [],
+    partitions: partitions,
     physicalDisks: [],
-    directories: diskMetrics?.directories || [],
+    directories: partitions, // Use partitions as directories for now
     performance: {
       current: {
-        readSpeed: 0, // Not provided in current metrics
-        writeSpeed: 0, // Not provided in current metrics
-        readIOPS: 0,
-        writeIOPS: 0,
+        readSpeed: readRate,
+        writeSpeed: writeRate,
+        readIOPS: 0, // Not provided in current metrics
+        writeIOPS: 0, // Not provided in current metrics
         utilization: diskUsage,
         queueDepth: 0,
         latency: {

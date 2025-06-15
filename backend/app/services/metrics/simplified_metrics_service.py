@@ -12,6 +12,9 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+
+from app.core.resilience import get_circuit_breaker, reset_circuit_breaker
+
 from app.services.metrics.simplified_cpu_service import SimplifiedCPUService
 from app.services.metrics.simplified_memory_service import SimplifiedMemoryService
 from app.services.metrics.simplified_disk_service import SimplifiedDiskService
@@ -39,7 +42,36 @@ class SimplifiedMetricsService:
             
         self.logger = logging.getLogger('SimplifiedMetricsService')
         self._initialized = True
-        self.logger.info("SimplifiedMetricsService initialized as singleton")
+        
+        self.cpu_circuit_breaker = get_circuit_breaker(
+        name="simplified_cpu_metrics", 
+        max_failures=3,
+        reset_timeout=15,
+        exponential_backoff_factor=1.5
+    )
+    
+        self.memory_circuit_breaker = get_circuit_breaker(
+        name="simplified_memory_metrics", 
+        max_failures=3,
+        reset_timeout=15,
+        exponential_backoff_factor=1.5
+    )
+    
+        self.disk_circuit_breaker = get_circuit_breaker(
+        name="simplified_disk_metrics", 
+        max_failures=3,
+        reset_timeout=15,
+        exponential_backoff_factor=1.5
+    )
+    
+        self.network_circuit_breaker = get_circuit_breaker(
+        name="simplified_network_metrics", 
+        max_failures=3,
+        reset_timeout=15,
+        exponential_backoff_factor=1.5
+    )
+    
+        self.logger.info("SimplifiedMetricsService initialized as singleton with circuit breakers")
     
     @classmethod
     async def get_instance(cls):
@@ -54,64 +86,125 @@ class SimplifiedMetricsService:
             self._lock = asyncio.Lock()
         return self._lock
     
+    async def _safe_get_metrics(self, service, circuit_breaker, service_name):
+        """
+        Safely get metrics from a service with circuit breaker protection
+        
+        Args:
+            service: The metrics service to call
+            circuit_breaker: The circuit breaker for this service
+            service_name: Name of the service for logging
+        
+            Returns:
+            Dictionary with metrics data or empty dict on error
+        """
+        # Check if circuit breaker allows the call
+        if not circuit_breaker.can_attempt_connection():
+            self.logger.warning(f"{service_name} circuit breaker is open, skipping metrics collection")
+            return {'data': {}, 'error': f"{service_name} circuit breaker open"}
+    
+        try:
+            metrics = await service.get_metrics()
+            # Record success in circuit breaker
+            circuit_breaker.record_success()
+            return metrics
+        except Exception as e:
+            # Record failure in circuit breaker
+            circuit_breaker.record_failure()
+            self.logger.error(f"Error collecting {service_name} metrics: {str(e)}")
+            return {'data': {}, 'error': str(e)}
+        
+    async def get_cpu_metrics(self, force_refresh=False) -> Dict[str, Any]:
+        """Get CPU metrics only"""
+        cpu_service = await SimplifiedCPUService.get_instance()
+        result = await self._safe_get_metrics(cpu_service, self.cpu_circuit_breaker, "CPU")
+        return result.get('data', {})
+
+    async def get_memory_metrics(self, force_refresh=False) -> Dict[str, Any]:
+        """Get memory metrics only"""
+        memory_service = await SimplifiedMemoryService.get_instance()
+        result = await self._safe_get_metrics(memory_service, self.memory_circuit_breaker, "Memory")
+        return result.get('data', {})
+
+    async def get_disk_metrics(self, force_refresh=False) -> Dict[str, Any]:
+        """Get disk metrics only"""
+        disk_service = await SimplifiedDiskService.get_instance()
+        result = await self._safe_get_metrics(disk_service, self.disk_circuit_breaker, "Disk")
+        return result.get('data', {})
+
+    async def get_network_metrics(self, force_refresh=False) -> Dict[str, Any]:
+        """Get network metrics only"""
+        network_service = await SimplifiedNetworkService.get_instance()
+        result = await self._safe_get_metrics(network_service, self.network_circuit_breaker, "Network")
+        return result.get('data', {})
+        
     async def get_metrics(self, force_refresh=False) -> Dict[str, Any]:
         """
         Get comprehensive system metrics from all services.
         
         Args:
             force_refresh: Ignored in this implementation (no caching)
-            
+        
         Returns:
-            Dictionary containing all system metrics
+        Dictionary containing all system metrics
         """
         try:
-            # Get lock to prevent multiple concurrent collections
-            lock = await self._get_lock()
-            async with lock:
-                # Initialize services
-                cpu_service = await SimplifiedCPUService.get_instance()
-                memory_service = await SimplifiedMemoryService.get_instance()
-                disk_service = await SimplifiedDiskService.get_instance()
-                network_service = await SimplifiedNetworkService.get_instance()
+            # Create tasks for concurrent execution
+            cpu_task = asyncio.create_task(self.get_cpu_metrics(force_refresh))
+            memory_task = asyncio.create_task(self.get_memory_metrics(force_refresh))
+            disk_task = asyncio.create_task(self.get_disk_metrics(force_refresh))
+            network_task = asyncio.create_task(self.get_network_metrics(force_refresh))
+            
+            # Wait for all metrics to be collected
+            cpu_data, memory_data, disk_data, network_data = await asyncio.gather(
+                cpu_task, memory_task, disk_task, network_task
+            )
+            
+            # No need to extract data, as our get_*_metrics methods already return the data directly
+            # Track if we have any errors
+            errors = {}
+            
+            # Check for errors in each metrics result
+            if isinstance(cpu_data, dict) and 'error' in cpu_data:
+                errors['cpu'] = cpu_data['error']
+            if isinstance(memory_data, dict) and 'error' in memory_data:
+                errors['memory'] = memory_data['error']
+            if isinstance(disk_data, dict) and 'error' in disk_data:
+                errors['disk'] = disk_data['error']
+            if isinstance(network_data, dict) and 'error' in network_data:
+                errors['network'] = network_data['error']
                 
-                # Collect metrics from each service concurrently
-                cpu_task = asyncio.create_task(cpu_service.get_metrics())
-                memory_task = asyncio.create_task(memory_service.get_metrics())
-                disk_task = asyncio.create_task(disk_service.get_metrics())
-                network_task = asyncio.create_task(network_service.get_metrics())
-                
-                # Wait for all metrics to be collected
-                cpu_metrics, memory_metrics, disk_metrics, network_metrics = await asyncio.gather(
-                    cpu_task, memory_task, disk_task, network_task
-                )
-                
-                # Extract the data from each service
-                cpu_data = cpu_metrics['data']
-                memory_data = memory_metrics['data']
-                disk_data = disk_metrics['data']
-                network_data = network_metrics['data']
-                
-                # Combine all metrics into a single response
-                return {
-                    'timestamp': datetime.now().isoformat(),
-                    'cpu_usage': cpu_data['usage_percent'],
-                    'memory_usage': memory_data['percent'],
-                    'disk_usage': disk_data['percent'],
-                    'network_sent_rate': network_data['sent_rate'],
-                    'network_recv_rate': network_data['recv_rate'],
-                    'cpu': cpu_data,
-                    'memory': memory_data,
-                    'disk': disk_data,
-                    'network': network_data,
-                    'process_count': len(cpu_data.get('top_processes', [])),
-                    'system_info': {
-                        'hostname': network_data.get('interfaces', [{}])[0].get('name', 'unknown') if network_data.get('interfaces') else 'unknown',
-                        'physical_cores': cpu_data.get('physical_cores', 0),
-                        'logical_cores': cpu_data.get('logical_cores', 0),
-                        'total_memory': memory_data.get('total', 0),
-                        'total_disk': disk_data.get('total', 0)
-                    }
+            # Determine if we have any errors
+            has_errors = len(errors) > 0
+            
+            # Combine all metrics into a single response
+            result = {
+                'timestamp': datetime.now().isoformat(),
+                'cpu_usage': cpu_data.get('usage_percent', 0),
+                'memory_usage': memory_data.get('percent', 0),
+                'disk_usage': disk_data.get('percent', 0),
+                'network_sent_rate': network_data.get('sent_rate', 0),
+                'network_recv_rate': network_data.get('recv_rate', 0),
+                'cpu': cpu_data,
+                'memory': memory_data,
+                'disk': disk_data,
+                'network': network_data,
+                'process_count': len(cpu_data.get('top_processes', [])),
+                'system_info': {
+                    'hostname': network_data.get('interfaces', [{}])[0].get('name', 'unknown') if network_data.get('interfaces') else 'unknown',
+                    'physical_cores': cpu_data.get('physical_cores', 0),
+                    'logical_cores': cpu_data.get('logical_cores', 0),
+                    'total_memory': memory_data.get('total', 0),
+                    'total_disk': disk_data.get('total', 0)
                 }
+            }
+            
+            # Add error information if any
+            if has_errors:
+                result['has_errors'] = True
+                result['errors'] = errors
+                
+            return result
                 
         except Exception as e:
             self.logger.error(f"Error collecting system metrics: {str(e)}")
@@ -129,30 +222,10 @@ class SimplifiedMetricsService:
                 'network': {},
                 'process_count': 0,
                 'system_info': {},
-                'error': str(e)
-            }
+                'error': str(e),
+                'has_errors': True
+        }
     
-    async def get_cpu_metrics(self, force_refresh=False) -> Dict[str, Any]:
-        """Get CPU metrics only"""
-        cpu_service = await SimplifiedCPUService.get_instance()
-        return (await cpu_service.get_metrics())['data']
-    
-    async def get_memory_metrics(self, force_refresh=False) -> Dict[str, Any]:
-        """Get memory metrics only"""
-        memory_service = await SimplifiedMemoryService.get_instance()
-        return (await memory_service.get_metrics())['data']
-    
-    async def get_disk_metrics(self, force_refresh=False) -> Dict[str, Any]:
-        """Get disk metrics only"""
-        disk_service = await SimplifiedDiskService.get_instance()
-        return (await disk_service.get_metrics())['data']
-    
-    async def get_network_metrics(self, force_refresh=False) -> Dict[str, Any]:
-        """Get network metrics only"""
-        network_service = await SimplifiedNetworkService.get_instance()
-        return (await network_service.get_metrics())['data']
-
-
 # Test function to run the service directly
 async def test_simplified_metrics_service():
     """Test the simplified metrics service"""

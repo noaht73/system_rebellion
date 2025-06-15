@@ -16,6 +16,7 @@ from app.core.resilience.circuit_breaker import (
     WebSocketCircuitBreaker,
     get_circuit_breaker,
     reset_all_circuit_breakers,
+    reset_circuit_breaker,
     CircuitState
 )
 
@@ -43,6 +44,7 @@ __all__ = [
     'WebSocketCircuitBreaker',
     'get_circuit_breaker',
     'reset_all_circuit_breakers',
+    'reset_circuit_breaker',
     'CircuitState',
     'BackpressureHandler',
     'get_backpressure_handler',

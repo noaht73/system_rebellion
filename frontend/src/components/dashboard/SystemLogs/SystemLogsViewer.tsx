@@ -5,7 +5,6 @@ import {
   Paper, 
   List, 
   ListItem, 
-  ListItemText, 
   Chip, 
   Button, 
   FormControl, 
@@ -202,31 +201,30 @@ const SystemLogsViewer: React.FC<SystemLogsViewerProps> = ({
                     },
                   }}
                 >
-                  <ListItemText
-                    primary={
-                      <Box component = "span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {React.cloneElement(levelConfig.icon as React.ReactElement, { 
-                          style: { color: `var(--${levelConfig.color}-main)`, fontSize: '1rem' } 
-                        })}
-                        <Typography variant="body1" component="div" sx={{ fontWeight: 'medium' }}>
-                          {log.message}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <Box component = "span" sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                        <Chip
-                          label={getSourceDisplayName(log.source)}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                        <Typography variant="body2" color="textSecondary" component="div">
-                          {formatTimestamp(log.timestamp)}
-                        </Typography>
-                      </Box>
-                    }
-                  />
+                  <Box sx={{ width: '100%', py: 1 }}>
+                    {/* Primary content */}
+                    <Box component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      {React.cloneElement(levelConfig.icon as React.ReactElement<any>, { 
+                        sx: { color: `var(--${levelConfig.color}-main)`, fontSize: '1rem' } 
+                      })}
+                      <Typography variant="body1" component="div" sx={{ fontWeight: 'medium' }}>
+                        {log.message}
+                      </Typography>
+                    </Box>
+                    
+                    {/* Secondary content */}
+                    <Box component="div" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip
+                        label={getSourceDisplayName(log.source)}
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: '0.7rem' }}
+                      />
+                      <Typography variant="body2" color="textSecondary" component="span">
+                        {formatTimestamp(log.timestamp)}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </ListItem>
               );
             })}

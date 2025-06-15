@@ -1,33 +1,32 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { MetricAlert, AlertSeverity } from '../../../types/metrics';
 
+// Updated to match simplified backend memory data structure
 export interface MemoryMetric {
+    timestamp: string | number | Date;
     total: number;
     available: number;
-    swap: any;
+    used: number;
+    free: number;
+    percent: number;
     cached: number;
     buffers: number;
-    timestamp: string | number | Date;
-    additional: any;
-    memory_buffer: number;
-    memory_available: number;
-    memory_used: number;
-    memory_free: number;
-    memory_cache: number;
-    memory_swap_percent: number;
-    memory_swap_free: number;
-    memory_swap_used: any;
-    memory_swap_total: number;
-    memory_total: number;
-    memory_percent: any;
-    usage_percent: number;
-    total_space: number;
-    used_space: number;
-    available_space: number;
-    mount_point: string;
-    file_system: string;
-    type: string;
-    alerts: MetricAlert[];
+    shared: number;
+    swap: {
+        total: number;
+        used: number;
+        free: number;
+        percent: number;
+        sin: number;
+        sout: number;
+    };
+    top_processes: {
+        pid: number;
+        name: string;
+        username: string;
+        memory_percent: number;
+        memory_mb: number;
+    }[];
 }
 
 export interface MemoryThresholds {
@@ -53,8 +52,8 @@ const initialState: MemoryState = {
     alerts: [],
     thresholds: {
         usage: {
-            warning: 70,
-            critical: 90
+            warning: 80,
+            critical: 95
         }
     },
     memoryLoading: false,
@@ -62,39 +61,40 @@ const initialState: MemoryState = {
     lastUpdated: null
 };
 
+// Helper function to check memory thresholds and generate alerts
 const checkThresholds = (metrics: MemoryMetric, thresholds: MemoryThresholds): MetricAlert[] => {
     const alerts: MetricAlert[] = [];
     const now = new Date().toISOString();
 
     // Check memory usage threshold
-    if (metrics.usage_percent >= thresholds.usage.critical) {
+    if (metrics.percent >= thresholds.usage.critical) {
         alerts.push({
             id: `memory-usage-${Date.now()}`,
             metric_type: 'memory',
             type: 'usage',
             severity: AlertSeverity.HIGH,
             threshold: thresholds.usage.critical,
-            current_value: metrics.usage_percent,
+            current_value: metrics.percent,
             timestamp: now,
-            message: `Memory usage critical: ${metrics.usage_percent}%`
+            message: `Memory usage critical: ${metrics.percent.toFixed(1)}%`
         });
-    } else if (metrics.usage_percent >= thresholds.usage.warning) {
+    } else if (metrics.percent >= thresholds.usage.warning) {
         alerts.push({
             id: `memory-usage-${Date.now()}`,
             metric_type: 'memory',
             type: 'usage',
             severity: AlertSeverity.MEDIUM,
             threshold: thresholds.usage.warning,
-            current_value: metrics.usage_percent,
+            current_value: metrics.percent,
             timestamp: now,
-            message: `Memory usage high: ${metrics.usage_percent}%`
+            message: `Memory usage high: ${metrics.percent.toFixed(1)}%`
         });
     }
 
     return alerts;
 };
 
-const memorySlice = createSlice({
+export const memorySlice = createSlice({
     name: 'memory',
     initialState,
     reducers: {
@@ -106,6 +106,8 @@ const memorySlice = createSlice({
             state.memoryLoading = false;
         },
         updateMemoryMetrics: (state, action: PayloadAction<MemoryMetric>) => {
+            console.log(' Memory Slice - updateMemoryMetrics called with payload:', action.payload);
+            
             const newMetric = action.payload;
             state.current = newMetric;
             state.historical = [...state.historical, newMetric].slice(-1000); // Keep last 1000 readings
@@ -119,6 +121,8 @@ const memorySlice = createSlice({
             
             state.memoryLoading = false;
             state.memoryError = null;
+            
+            console.log(' Memory Slice - update complete, current usage:', state.current?.percent);
         },
         updateThresholds: (state, action: PayloadAction<Partial<MemoryThresholds>>) => {
             state.thresholds = {
@@ -138,7 +142,7 @@ const memorySlice = createSlice({
             state.lastUpdated = null;
         }
     }
-}); 
+});
 
 // Export actions
 export const {
@@ -157,6 +161,7 @@ export const selectMemoryAlerts = (state: { memory: MemoryState }) => state.memo
 export const selectMemoryThresholds = (state: { memory: MemoryState }) => state.memory.thresholds;
 export const selectMemoryLoading = (state: { memory: MemoryState }) => state.memory.memoryLoading;
 export const selectMemoryError = (state: { memory: MemoryState }) => state.memory.memoryError;
-export const selectMemoryLastUpdated = (state: { memory: MemoryState }) => state.memory.lastUpdated;    
+export const selectMemoryLastUpdated = (state: { memory: MemoryState }) => state.memory.lastUpdated;
 
+// Export the reducer
 export default memorySlice.reducer;

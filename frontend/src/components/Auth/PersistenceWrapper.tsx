@@ -8,7 +8,8 @@ interface PersistenceWrapperProps {
   children: React.ReactNode;
 }
 
-const PersistenceWrapper: React.FC<PersistenceWrapperProps> = ({ children }) => {
+const PersistenceWrapper: React.FC<PersistenceWrapperProps> = (props) => {
+  const { children } = props;
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
   const dispatch = useAppDispatch();

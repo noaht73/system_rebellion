@@ -163,3 +163,12 @@ def reset_all_circuit_breakers() -> None:
     """Reset all circuit breakers (useful for testing)"""
     for breaker in _circuit_breakers.values():
         breaker.reset()
+
+
+def reset_circuit_breaker(name: str = "default") -> None:
+    """Reset a specific circuit breaker by name"""
+    if name in _circuit_breakers:
+        _circuit_breakers[name].reset()
+    else:
+        logger.warning(f"Circuit breaker '{name}' not found")
+        raise ValueError(f"Circuit breaker '{name}' not found")

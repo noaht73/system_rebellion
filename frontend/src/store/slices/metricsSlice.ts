@@ -13,7 +13,8 @@ const initialState: MetricsState = {
   status: 'disconnected',
   lastUpdated: null,
   error: null,
-  useWebSocket: true, // Toggle between WebSocket and REST API
+  useWebSocket: true,
+  historical: undefined
 };
 
 const metricsSlice = createSlice({

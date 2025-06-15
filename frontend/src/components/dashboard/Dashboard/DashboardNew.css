@@ -19,6 +19,81 @@
   margin-bottom: 1.5rem;
 }
 
+/* Connection Controls */
+.connection-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Connection Status Indicator */
+.connection-status {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.connection-status.connected {
+  background-color: rgba(0, 200, 83, 0.2);
+  color: #00833e;
+  border: 1px solid rgba(0, 200, 83, 0.4);
+}
+
+.connection-status.connecting {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #c79100;
+  border: 1px solid rgba(255, 193, 7, 0.4);
+}
+
+.connection-status.error {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #c62828;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+/* Circuit Reset Button */
+.circuit-reset-button {
+  background: rgba(77, 22, 114, 0.5);
+  color: #e0e0ff;
+  border: 1px solid rgba(127, 8, 206, 0.6);
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.circuit-reset-button:hover {
+  background: rgba(77, 22, 114, 0.7);
+  box-shadow: 0 0 10px rgba(127, 8, 206, 0.5);
+}
+
+/* Refresh Button */
+.refresh-button {
+  background: rgba(0, 150, 136, 0.5);
+  color: #e0e0ff;
+  border: 1px solid rgba(0, 150, 136, 0.6);
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.refresh-button:hover {
+  background: rgba(0, 150, 136, 0.7);
+  box-shadow: 0 0 10px rgba(0, 150, 136, 0.5);
+}
+
 .dashboard-header h1 {
   font-size: 1.8rem;
   margin-bottom: 1rem;

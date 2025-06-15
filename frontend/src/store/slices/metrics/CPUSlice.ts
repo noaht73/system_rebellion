@@ -1,30 +1,27 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { MetricAlert, AlertSeverity } from '../../../types/metrics';
 
+// Updated to match simplified backend CPU data structure
 export interface CPUMetric {
-  cpu_usage: number;
-  cpu_thread_count: number;
-  cpu_core_count: number;
-  cpu_frequency: number;
-  cpu_temperature: number;
-  cpu: any;
-  timestamp: any;
-  cpu_model: string;
+  cpu_usage: any;
   usage_percent: number;
-  cores: {
-    id: number;
-    usage: number;
-  }[];
   physical_cores: number;
   logical_cores: number;
-  temperature?: number;
   frequency_mhz: number;
+  temperature?: number;
+  cores: number[]; // Per-core usage percentages
   top_processes: {
     pid: number;
     name: string;
+    username: string;
     cpu_percent: number;
     memory_percent: number;
   }[];
+  frequency_details: {
+    current: number;
+    min: number;
+    max: number;
+  };
 }
 
 export interface CPUThresholds {
@@ -82,7 +79,7 @@ const checkThresholds = (metrics: CPUMetric, thresholds: CPUThresholds): MetricA
       threshold: thresholds.usage.critical,
       current_value: metrics.usage_percent,
       timestamp: now,
-      message: `CPU usage critical: ${metrics.usage_percent}%`
+      message: `CPU usage critical: ${metrics.usage_percent.toFixed(1)}%`
     });
   } else if (metrics.usage_percent >= thresholds.usage.warning) {
     alerts.push({
@@ -93,7 +90,7 @@ const checkThresholds = (metrics: CPUMetric, thresholds: CPUThresholds): MetricA
       threshold: thresholds.usage.warning,
       current_value: metrics.usage_percent,
       timestamp: now,
-      message: `CPU usage high: ${metrics.usage_percent}%`
+      message: `CPU usage high: ${metrics.usage_percent.toFixed(1)}%`
     });
   }
 
@@ -108,7 +105,7 @@ const checkThresholds = (metrics: CPUMetric, thresholds: CPUThresholds): MetricA
         threshold: thresholds.temperature.critical,
         current_value: metrics.temperature,
         timestamp: now,
-        message: `CPU temperature critical: ${metrics.temperature}°C`
+        message: `CPU temperature critical: ${metrics.temperature.toFixed(1)}°C`
       });
     } else if (metrics.temperature >= thresholds.temperature.warning) {
       alerts.push({
@@ -119,7 +116,7 @@ const checkThresholds = (metrics: CPUMetric, thresholds: CPUThresholds): MetricA
         threshold: thresholds.temperature.warning,
         current_value: metrics.temperature,
         timestamp: now,
-        message: `CPU temperature high: ${metrics.temperature}°C`
+        message: `CPU temperature high: ${metrics.temperature.toFixed(1)}°C`
       });
     }
   }
@@ -140,14 +137,11 @@ export const cpuSlice = createSlice({
     },
     updateCPUMetrics: (state, action: PayloadAction<CPUMetric>) => {
       console.log('🔄 CPU Slice - updateCPUMetrics called with payload:', action.payload);
-      console.log('🔄 CPU Slice - payload structure:', JSON.stringify(action.payload, null, 2));
       
       const newMetric = action.payload;
       state.current = newMetric;
       state.historical = [...state.historical, newMetric].slice(-1000); // Keep last 1000 readings
       state.lastUpdated = new Date().toISOString();
-      
-      console.log('🔄 CPU Slice - current state after update:', JSON.stringify(state.current, null, 2));
       
       // Check for threshold violations
       const alerts = checkThresholds(newMetric, state.thresholds);
@@ -158,21 +152,18 @@ export const cpuSlice = createSlice({
       state.cpuLoading = false;
       state.cpuError = null;
       
-      console.log('🔄 CPU Slice - update complete, state is now ready for components');
+      console.log('🔄 CPU Slice - update complete, current usage:', state.current?.usage_percent);
     },
-    // @ts-ignore - Adding this reducer even though it's not in the initial type
-    updateThresholds: (state: { thresholds: any; }, action: PayloadAction<Partial<CPUThresholds>>) => {
+    updateThresholds: (state, action: PayloadAction<Partial<CPUThresholds>>) => {
       state.thresholds = {
         ...state.thresholds,
         ...action.payload
       };
     },
-    // @ts-ignore - Adding this reducer even though it's not in the initial type
-    clearAlerts: (state: { alerts: never[]; }) => {
+    clearAlerts: (state) => {
       state.alerts = [];
     },
-    // @ts-ignore - Adding this reducer even though it's not in the initial type
-    reset: (state: { current: null; historical: never[]; alerts: never[]; cpuLoading: boolean; cpuError: null; lastUpdated: null; }) => {
+    reset: (state) => {
       state.current = null;
       state.historical = [];
       state.alerts = [];

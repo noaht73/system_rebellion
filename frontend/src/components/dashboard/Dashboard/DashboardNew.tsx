@@ -48,6 +48,18 @@ export const DashboardNew: React.FC<DashboardProps> = () => {
     }
     return "System Dashboard";
   };
+  
+  // Handle refresh button click
+  const handleRefresh = () => {
+    console.log('Manual refresh requested');
+    webSocketControls.requestSystemInfo();
+  };
+  
+  // Handle circuit breaker reset
+  const handleResetCircuitBreaker = () => {
+    console.log('Resetting circuit breaker and reconnecting...');
+    webSocketControls.resetCircuitBreaker();
+  };
 
   // Get metrics data to check if we have any metrics loaded
   const cpuMetrics = useAppSelector(state => state.cpu.current);
@@ -80,21 +92,40 @@ export const DashboardNew: React.FC<DashboardProps> = () => {
     );
   }
 
-  // Use the webSocketControls initialized above
-  
   // Show error state
   if (error) {
     return (
       <div className="error-container">
+        <div className="dashboard-header">
+          <h1>System Dashboard</h1>
+          <div className="connection-controls">
+            <div className={`connection-status ${status}`}>
+              {status === 'connected' ? '🟢 Connected' : 
+               status === 'error' ? '🔴 Disconnected' : 
+               '🟡 Connecting...'}
+            </div>
+            <button 
+              className="circuit-reset-button"
+              onClick={handleResetCircuitBreaker}
+              title="Reset the circuit breaker and reconnect"
+            >
+              🔄 Reset Connection
+            </button>
+            <button 
+              className="refresh-button" 
+              onClick={handleRefresh}
+              title="Refresh metrics data"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
         <h2>⚠️ Connection Error</h2>
         <p>{error}</p>
         <div className="error-actions">
           <button 
             className="retry-button"
-            onClick={() => {
-              console.log('Resetting circuit breaker and reconnecting...');
-              webSocketControls.resetCircuitBreaker();
-            }}
+            onClick={handleResetCircuitBreaker}
           >
             Reset Circuit Breaker & Reconnect
           </button>
@@ -114,6 +145,27 @@ export const DashboardNew: React.FC<DashboardProps> = () => {
     <div className="dashboard">
       <div className="dashboard-header">
         <h1>{getWelcomeMessage()}</h1>
+        <div className="connection-controls">
+          <div className={`connection-status ${status}`}>
+            {status === 'connected' ? '🟢 Connected' : 
+             status === 'error' ? '🔴 Disconnected' : 
+             '🟡 Connecting...'}
+          </div>
+          <button 
+            className="circuit-reset-button"
+            onClick={handleResetCircuitBreaker}
+            title="Reset the circuit breaker and reconnect"
+          >
+            🔄 Reset Connection
+          </button>
+          <button 
+            className="refresh-button" 
+            onClick={handleRefresh}
+            title="Refresh metrics data"
+          >
+            🔄 Refresh
+          </button>
+        </div>
         <SystemStatus loading={loading} error={error} />
       </div>
       

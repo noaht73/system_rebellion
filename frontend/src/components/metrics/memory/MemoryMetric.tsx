@@ -50,7 +50,7 @@ export const MemoryMetric: React.FC<MemoryMetricProps> = ({
   }
   
   // Handle error state
-  if (error || !currentMetric?.memory_percent) {
+  if (error || !currentMetric?.percent) {
     return dashboardMode ? (
       <div className={`memory-metric ${compact ? 'compact' : ''}`} style={{ height }}>
         <MetricsCard title="Memory Usage" value="--" unit="%" status="critical" />
@@ -64,14 +64,34 @@ export const MemoryMetric: React.FC<MemoryMetricProps> = ({
     );
   }
 
-  // Extract memory data from metrics
-  const memoryUsage = currentMetric.memory_percent || 0;
+  // Extract memory data from metrics - use the correct field names from new backend
+  const memoryUsage = currentMetric.percent || 0;
+  const totalMemory = currentMetric.total || 0;
+  const usedMemory = currentMetric.used || 0;
+  const freeMemory = currentMetric.free || 0;
+  const availableMemory = currentMetric.available || 0;
+  const cachedMemory = currentMetric.cached || 0;
+  const buffersMemory = currentMetric.buffers || 0;
+  const sharedMemory = currentMetric.shared || 0;
   
-  const totalMemory = currentMetric.memory_total || 0;
+  // Extract swap data
+  const swapData = currentMetric.swap || {};
+  const swapTotal = swapData.total || 0;
+  const swapUsed = swapData.used || 0;
+  const swapFree = swapData.free || 0;
+  const swapPercent = swapData.percent || 0;
   
-  const usedMemory = (memoryUsage / 100) * totalMemory;
-  
-  const freeMemory = totalMemory - usedMemory;
+  // Extract top processes
+  const topProcesses = currentMetric.top_processes || [];
+
+  // Debug logging for the new data structure
+  console.log('🔧 Memory Component - New backend data structure:');
+  console.log('🔧 percent:', currentMetric.percent);
+  console.log('🔧 total:', currentMetric.total);
+  console.log('🔧 used:', currentMetric.used);
+  console.log('🔧 available:', currentMetric.available);
+  console.log('🔧 swap:', swapData);
+  console.log('🔧 top_processes length:', topProcesses.length);
 
   // Process raw metrics into the format expected by tab components
   const processedData: ProcessedMemoryData = {
@@ -83,29 +103,29 @@ export const MemoryMetric: React.FC<MemoryMetricProps> = ({
         percentUsed: memoryUsage
       },
       swap: {
-        total: currentMetric.memory_swap_total || totalMemory,
-        used: currentMetric.memory_swap_used ? (currentMetric.memory_swap_percent / 100) * (currentMetric.memory_swap_total || totalMemory) : 0,
-        free: currentMetric.memory_swap_free || (totalMemory - ((currentMetric.memory_swap_percent || 0) / 100) * totalMemory),
-        percentUsed: currentMetric.memory_swap_percent || 0
+        total: swapTotal,
+        used: swapUsed,
+        free: swapFree,
+        percentUsed: swapPercent
       },
-      cached: currentMetric.memory_cache || 0,
-      active: currentMetric.memory_available || 0, // Using memory_available as a substitute for active memory
-      buffers: currentMetric.memory_buffer || 0,
+      cached: cachedMemory,
+      active: availableMemory, // Using availableMemory as a substitute for active memory
+      buffers: buffersMemory,
       pressureLevel: 'low', // Default to low if not available
       pressureIndicators: {
         pageInRate: 0, // These would come from metrics in a real implementation
         pageOutRate: 0,
-        swapUsageRate: currentMetric.memory_swap_percent || 0
+        swapUsageRate: swapPercent
       }
     },
     processes: {
-      topConsumers: (currentMetric.additional?.top_memory_processes || []).map((proc: any) => ({
+      topConsumers: topProcesses.map((proc: any) => ({
         pid: proc.pid || 0,
         name: proc.name || 'Unknown',
         command: proc.command || '',
         rss: proc.memory_usage || 0,
         vms: 0, // Default value
-        shared: 0, // Default value
+        shared: sharedMemory, // Default value
         percentMemory: proc.memory_percent || 0
       })) as MemoryProcess[],
       growthTrends: [],
@@ -150,7 +170,7 @@ export const MemoryMetric: React.FC<MemoryMetricProps> = ({
   // Prepare historical data for area chart
   const memoryHistoryData = historicalMetrics.map(metric => ({
     timestamp: new Date(metric.timestamp).getTime(),
-    usage: metric.memory_percent
+    usage: metric.percent
   }));
 
   // Calculate memory status
@@ -167,8 +187,8 @@ export const MemoryMetric: React.FC<MemoryMetricProps> = ({
   const memoryPieData = [
     { name: 'Used', value: usedMemory },
     { name: 'Free', value: freeMemory },
-    { name: 'Cached', value: currentMetric.memory_cache || 0 },
-    { name: 'Buffers', value: currentMetric.memory_buffer || 0 }
+    { name: 'Cached', value: cachedMemory },
+    { name: 'Buffers', value: buffersMemory }
   ];
   
   // If using dashboard mode, render the dashboard style
@@ -261,8 +281,6 @@ export const MemoryMetric: React.FC<MemoryMetricProps> = ({
       </div>
     );
   }
-  
-  // We already have processedData defined above, no need to redefine it
   
   // Render full tabbed version for component mode
   return (
