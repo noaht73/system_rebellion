@@ -210,8 +210,14 @@ class AuthService {
         console.log('🦔 Sir Hawkington: Token refreshed successfully:', newToken ? `${newToken.substring(0, 20)}...` : 'null');
         return newToken;
       } catch (error) {
-        console.error('🚨 Failed to refresh token:', error);
-        return null; // Return the expired token as fallback - the backend will handle rejection
+        console.error('🚨 Failed to refresh token. Logging out.', error);
+        // Clear invalid tokens from storage
+        localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('username');
+        // Redirect to login page to force re-authentication
+        window.location.href = '/login';
+        return null; // Abort any further action
       }
     }
     

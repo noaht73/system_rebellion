@@ -32,8 +32,8 @@ export default defineConfig({
           });
         }
       },
-      // WebSocket proxy for system metrics - Sir Hawkington's domain
-      '/ws/system-metrics': {
+      // WebSocket proxy for all /ws requests
+      '/ws': {
         target: 'ws://127.0.0.1:8000',
         ws: true,
         changeOrigin: true,

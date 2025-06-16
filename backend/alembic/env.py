@@ -10,12 +10,11 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from sqlalchemy.ext.declarative import declarative_base
-Base = declarative_base()
+# Import the correct Base from the application's core
+from app.core.base import Base
 
-#import your sqlalchemy models:
-#from app.models import Base # Import your Base and models
-from app.models import user
+# Import all application models so that Alembic can "see" them
+from app.models import user, alerts, metrics, system, tuning_history
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

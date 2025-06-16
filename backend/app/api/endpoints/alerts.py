@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy import func
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
@@ -79,7 +79,7 @@ async def create_system_alert(
         severity=alert_data.severity,
         additional_data=alert_data.additional_data,
         is_read=alert_data.is_read,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
     
     db.add(alert)

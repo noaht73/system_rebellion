@@ -1,5 +1,4 @@
 // src/services/websocket/WebSocketService.ts
-import authService from '../../services/authService';
 import { 
   WebSocketMessage, 
   ConnectionStatus, 
@@ -154,6 +153,7 @@ export class WebSocketService {
   public onMessage: ((message: WebSocketMessage) => void) | null = null;
   public onConnectionStatusChange: ((status: ConnectionStatus) => void) | null = null;
   public onError: ((error: Error) => void) | null = null;
+  private lastToken: string | null = null; // For reconnection
   
   // Resilience components
   private circuitBreaker: CircuitBreaker;
@@ -187,17 +187,30 @@ export class WebSocketService {
   }
   
   // Get the WebSocket URL (NO TOKEN!)
-  private getWebSocketUrl(): string {
+  private buildWebSocketUrl(token: string): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = process.env.NODE_ENV === 'development' 
       ? 'localhost:8000' 
       : window.location.host;
-    
-    return `${protocol}//${host}/ws/system-metrics`;
+    const clientId = this.getClientId();
+    // Append the token as a query parameter for authentication
+    const url = `${protocol}//${host}/ws/system-metrics/${clientId}?token=${encodeURIComponent(token)}`;
+    console.log(`🦔 Generated WebSocket URL with token: ${url}`);
+    return url;
+  }
+
+  private getClientId(): string {
+    let clientId = localStorage.getItem('ws_client_id');
+    if (!clientId) {
+      clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      localStorage.setItem('ws_client_id', clientId);
+    }
+    return clientId;
   }
   
   // Main connection method
-  public async connect(): Promise<void> {
+  public async connect(token: string | null): Promise<void> {
+    this.lastToken = token;
     if (this.socket?.readyState === WebSocket.OPEN || 
         this.socket?.readyState === WebSocket.CONNECTING) {
       console.log('🦔 Already connected or connecting, dear chap!');
@@ -210,7 +223,14 @@ export class WebSocketService {
     }
     
     try {
-      const url = this.getWebSocketUrl();
+      if (!token) {
+      console.error('🚨 [WebSocketService] Connection attempt failed: No auth token provided.');
+      this.updateConnectionStatus('error');
+      // Do not attempt to reconnect if there's no token.
+      return;
+    }
+
+    const url = this.buildWebSocketUrl(token);
       console.log('🦔 Establishing WebSocket connection...');
       
       this.socket = new WebSocket(url);
@@ -230,10 +250,7 @@ export class WebSocketService {
     if (!this.socket) return;
     
     // Connection opened - wait for connection_established message before auth
-    this.socket.onopen = async () => {
-      console.log('🦔 WebSocket connected! Waiting for connection_established message...');
-      this.updateConnectionStatus('connected');
-    };
+    this.socket.onopen = this.onOpen;
     
     // Handle messages from server
     this.socket.onmessage = (event) => {
@@ -243,12 +260,7 @@ export class WebSocketService {
         
         switch (message.type) {
           case 'connection_established':
-            console.log('🦔 Connection established! Sending authentication...');
-            this.handleConnectionEstablished();
-            break;
-            
-          case 'auth_success':
-            this.handleAuthSuccess();
+            console.log('🦔 Connection established!');
             break;
             
           case 'auth_failed':
@@ -271,6 +283,11 @@ export class WebSocketService {
             
           case 'pong':
             console.log('🏓 Pong received');
+            break;
+
+          case 'heartbeat':
+            console.log('💓 Heartbeat received');
+            this.send(JSON.stringify({ type: 'pong' }));
             break;
             
           default:
@@ -305,49 +322,11 @@ export class WebSocketService {
     };
   }
   
-  private handleConnectionEstablished(): void {
-    // Get fresh token
-    console.log('🔍 Getting authentication token from authService...');
-    authService.getCurrentToken().then(token => {
-      console.log('🔍 Token received from authService:', token ? `${token.substring(0, 20)}...` : 'null/undefined');
-      
-      if (!token) {
-        console.error('🦔 No authentication token available!');
-        this.socket?.close();
-        return;
-      }
-      
-      // Get the user from localStorage as a backup
-      const username = localStorage.getItem('username');
-      
-      // Create auth message with token and user info
-      const authMessage = {
-        type: 'auth',
-        token: token,
-        username: username
-      };
-      
-      console.log('🔍 Sending authentication message:', {
-        type: authMessage.type,
-        token: authMessage.token ? `${authMessage.token.substring(0, 20)}...` : 'null/undefined',
-        username: authMessage.username,
-        messageLength: JSON.stringify(authMessage).length
-      });
-      
-      // Send authentication message
-      this.socket?.send(JSON.stringify(authMessage));
-      
-      console.log('🦔 Authentication message sent!');
-    }).catch(error => {
-      console.error('🚨 Failed to send auth:', error);
-      this.socket?.close();
-    });
-  }
-  
-  private handleAuthSuccess(): void {
-    console.log('🦔 Authentication successful!');
-    this.isAuthenticated = true;
+  private onOpen = (): void => {
+    console.log('✅ WebSocket connection opened and authenticated via URL token');
     this.updateConnectionStatus('connected');
+    this.isAuthenticated = true;
+    this.reconnectAttempts = 0;
     this.circuitBreaker.recordSuccess();
     this.startHeartbeat(); // Start heartbeat after successful authentication
   }
@@ -484,7 +463,7 @@ export class WebSocketService {
     
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
-      this.connect().catch(error => {
+      this.connect(this.lastToken).catch(error => {
         console.error('🦔 Reconnection failed:', error);
       });
     }, delay);
@@ -561,7 +540,7 @@ let wsInstance: WebSocketService | null = null;
 export const initWebSocket = (_dispatch: unknown): WebSocketService => {
   if (!wsInstance) {
     console.log('🦔 Initializing WebSocket service...');
-    wsInstance = new WebSocketService();
+        wsInstance = new WebSocketService();
   }
   return wsInstance;
 };

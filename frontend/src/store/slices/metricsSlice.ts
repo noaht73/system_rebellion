@@ -2,6 +2,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface MetricsState {
+  systemInfo: any | null; // Added to store system hardware details
   historical: any;
   status: 'disconnected' | 'connecting' | 'connected' | 'error';
   lastUpdated: string | null;
@@ -10,6 +11,7 @@ export interface MetricsState {
 }
 
 const initialState: MetricsState = {
+  systemInfo: null,
   status: 'disconnected',
   lastUpdated: null,
   error: null,
@@ -39,6 +41,9 @@ const metricsSlice = createSlice({
     toggleConnectionType: (state) => {
       state.useWebSocket = !state.useWebSocket;
     },
+    setSystemInfo: (state, action: PayloadAction<any>) => {
+      state.systemInfo = action.payload;
+    },
     resetMetrics: () => initialState,
   },
 });
@@ -49,6 +54,7 @@ export const {
   setLastUpdated,
   setError,
   toggleConnectionType,
+  setSystemInfo, // Export the new action
   resetMetrics,
 } = metricsSlice.actions;
 

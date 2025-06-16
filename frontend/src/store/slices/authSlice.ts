@@ -110,6 +110,7 @@ const authSlice = createSlice({
       state.isLoading = false;
       state.isAuthenticated = true;
       state.user = action.payload;
+      state.token = localStorage.getItem('token'); // Sync token from localStorage
       state.error = null;
     });
     builder.addCase(login.rejected, (state, action) => {
@@ -141,6 +142,7 @@ const authSlice = createSlice({
     builder.addCase(logout.fulfilled, (state) => {
       state.isAuthenticated = false;
       state.user = null;
+      state.token = null; // Clear token on logout
     });
     
     // Check auth status
@@ -151,6 +153,9 @@ const authSlice = createSlice({
       state.isLoading = false;
       state.isAuthenticated = !!action.payload;
       state.user = action.payload;
+      if (state.isAuthenticated) {
+        state.token = localStorage.getItem('token'); // Sync token on auth check
+      }
     });
     builder.addCase(checkAuthStatus.rejected, (state) => {
       state.isLoading = false;
