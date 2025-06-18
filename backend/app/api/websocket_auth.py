@@ -8,16 +8,16 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency to get an async database session.
     """
-    async with AsyncSessionLocal() as session:
-        yield session
+    async with AsyncSessionLocal() as db_session:
+        yield db_session
 
 async def get_user_from_token(
     websocket: WebSocket,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     token: str | None = Query(None),
 ) -> User | None:
     if token is None:

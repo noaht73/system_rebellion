@@ -20,8 +20,9 @@ def setup_middleware(app: FastAPI):
 
     # CORS Configuration
     origins = [
-        "http://localhost:5173",  # Frontend dev server
-        "http://localhost:8000",   # Default Vite port
+        "http://localhost:5173",  # Frontend dev server (Vite)
+        "http://localhost:8000",  # Backend server (self)
+        "http://127.0.0.1:8000", # Backend server (self, by IP)
         "https://system-rebellion.com",  # Production domain
         "https://system-rebellion.onrender.com",  # Render domain
         "https://system-rebellion-api.onrender.com"  # Render API domain

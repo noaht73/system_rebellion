@@ -35,8 +35,8 @@ class SimplifiedNetworkService:
             return
             
         self.logger = logging.getLogger('SimplifiedNetworkService')
-        self._last_io_counters = None
-        self._last_io_time = None
+        self._last_io_counters = psutil.net_io_counters()
+        self._last_io_time = time.time()
         self._initialized = True
         self.logger.info("SimplifiedNetworkService initialized as singleton")
     
@@ -105,8 +105,8 @@ class SimplifiedNetworkService:
             bytes_recv = 0
             packets_sent = 0
             packets_recv = 0
-            sent_rate = 0
-            recv_rate = 0
+            sent_rate = 0.0
+            recv_rate = 0.0
             
             current_time = time.time()
             total_io = psutil.net_io_counters()
@@ -228,8 +228,8 @@ class SimplifiedNetworkService:
                     'bytes_recv': 0,
                     'packets_sent': 0,
                     'packets_recv': 0,
-                    'sent_rate': 0,
-                    'recv_rate': 0,
+                    'sent_rate': 0.0,
+                    'recv_rate': 0.0,
                     'interfaces': [],
                     'connections': [],
                     'connection_stats': {},

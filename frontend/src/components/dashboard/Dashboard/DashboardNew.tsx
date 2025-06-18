@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import './DashboardNew.css';
 import { fetchPatterns } from '../../../store/slices/autoTunerSlice';
 import { fetchSystemAlerts } from '../../../store/slices/systemAlertsSlice';
-import useMetricsWebSocket from '../../../services/websocket/useMetricsWebSocket';
+import { useMetricsWebSocket } from '../../../services/websocket/useMetricsWebSocket';
 import { RootState } from '../../../store/store';
 import SystemStatus from './SystemStatus/SystemStatus';
 import CPUMetric from '../../../components/metrics/CPU/CPUMetric';
@@ -17,73 +17,64 @@ import SystemPatternsPanel from '../SystemPatternsPanel/SystemPatternsPanel';
 interface DashboardProps {}
 
 export const DashboardNew: React.FC<DashboardProps> = () => {
+  // Get the app dispatch function to dispatch actions
   const dispatch = useAppDispatch();
+
+  // Get the user from the auth state
   const { user } = useAppSelector((state) => state.auth);
-  const { status, error } = useAppSelector(
-    (state: RootState) => state.metrics
+
+  // Get the status and error from the metrics state
+  const { status, error } = useAppSelector((state: RootState) => state.metrics);
+  
+  // Determine if we're loading (connecting and no metrics data)
+  const loading = status === 'connecting' && !(
+    useAppSelector((state: RootState) => state.metrics.cpuMetrics) ||
+    useAppSelector((state: RootState) => state.metrics.memoryMetrics) ||
+    useAppSelector((state: RootState) => state.metrics.diskMetrics) ||
+    useAppSelector((state: RootState) => state.metrics.networkMetrics)
   );
-  const loading = status === 'connecting';
 
   // Establish WebSocket connection and get controls
-  const webSocketControls = useMetricsWebSocket();
+  const { requestSystemInfo, resetCircuitBreaker } = useMetricsWebSocket();
   
   // Fetch initial data
   useEffect(() => {
-    console.log("🚀 Initializing Dashboard...");
-    
+    // Fetch patterns
     dispatch(fetchPatterns() as any);
-    dispatch(fetchSystemAlerts({ skip: 0, limit: 5 }));
     
-    return () => {
-      console.log("🧹 Cleaning up Dashboard resources...");
-    };
+    // Fetch system alerts
+    dispatch(fetchSystemAlerts({ skip: 0, limit: 5 }));
   }, [dispatch]);
 
   // Display personalized welcome message if user is available
   const getWelcomeMessage = () => {
     if (user?.username) {
+      // Get the current hour
       const hour = new Date().getHours();
+      
+      // Determine the greeting
       const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+      
+      // Return the greeting with the username
       return `${greeting}, ${user.username}!`;
     }
+    
+    // Return the default welcome message
     return "System Dashboard";
   };
-  
-  // Handle refresh button click
-  const handleRefresh = () => {
-    console.log('Manual refresh requested');
-    webSocketControls.requestSystemInfo();
-  };
-  
-  // Handle circuit breaker reset
-  const handleResetCircuitBreaker = () => {
-    console.log('Resetting circuit breaker and reconnecting...');
-    webSocketControls.resetCircuitBreaker();
-  };
 
-  // Get metrics data to check if we have any metrics loaded
-  const cpuMetrics = useAppSelector(state => state.cpu.current);
-  const memoryMetrics = useAppSelector(state => state.memory.current);
-  const diskMetrics = useAppSelector(state => state.disk.current);
-  const networkMetrics = useAppSelector(state => state.network.current);
-  
   // Check if we have any metrics data
+  const {
+    cpuMetrics,
+    memoryMetrics,
+    diskMetrics,
+    networkMetrics
+  } = useAppSelector((state: RootState) => state.metrics);
+
   const hasMetricsData = cpuMetrics || memoryMetrics || diskMetrics || networkMetrics;
   
-  // Log metrics state for debugging
-  useEffect(() => {
-    console.log('Dashboard metrics state:', { 
-      status, 
-      hasMetricsData,
-      cpuMetrics, 
-      memoryMetrics, 
-      diskMetrics, 
-      networkMetrics 
-    });
-  }, [status, cpuMetrics, memoryMetrics, diskMetrics, networkMetrics]);
-  
   // Only show loading state if we're connecting AND have no metrics data
-  if ((status === 'connecting' || status === 'disconnected') && !hasMetricsData) {
+  if (loading) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
@@ -100,32 +91,32 @@ export const DashboardNew: React.FC<DashboardProps> = () => {
           <h1>System Dashboard</h1>
           <div className="connection-controls">
             <div className={`connection-status ${status}`}>
-              {status === 'connected' ? '🟢 Connected' : 
-               status === 'error' ? '🔴 Disconnected' : 
-               '🟡 Connecting...'}
+              {status === 'connected' ? ' ' : 
+               status === 'error' ? ' ' : 
+               ' '}
             </div>
             <button 
               className="circuit-reset-button"
-              onClick={handleResetCircuitBreaker}
+              onClick={resetCircuitBreaker}
               title="Reset the circuit breaker and reconnect"
             >
-              🔄 Reset Connection
+              Reset Connection
             </button>
             <button 
               className="refresh-button" 
-              onClick={handleRefresh}
+              onClick={requestSystemInfo}
               title="Refresh metrics data"
             >
-              🔄 Refresh
+              Refresh
             </button>
           </div>
         </div>
-        <h2>⚠️ Connection Error</h2>
+        <h2> Connection Error</h2>
         <p>{error}</p>
         <div className="error-actions">
           <button 
             className="retry-button"
-            onClick={handleResetCircuitBreaker}
+            onClick={resetCircuitBreaker}
           >
             Reset Circuit Breaker & Reconnect
           </button>
@@ -147,26 +138,25 @@ export const DashboardNew: React.FC<DashboardProps> = () => {
         <h1>{getWelcomeMessage()}</h1>
         <div className="connection-controls">
           <div className={`connection-status ${status}`}>
-            {status === 'connected' ? '🟢 Connected' : 
-             status === 'error' ? '🔴 Disconnected' : 
-             '🟡 Connecting...'}
+            {status === 'connected' ? ' ' : 
+             status === 'error' ? ' ' : 
+             ' '}
           </div>
           <button 
             className="circuit-reset-button"
-            onClick={handleResetCircuitBreaker}
+            onClick={resetCircuitBreaker}
             title="Reset the circuit breaker and reconnect"
           >
-            🔄 Reset Connection
+            Reset Connection
           </button>
           <button 
             className="refresh-button" 
-            onClick={handleRefresh}
+            onClick={requestSystemInfo}
             title="Refresh metrics data"
           >
-            🔄 Refresh
+            Refresh
           </button>
         </div>
-        <SystemStatus loading={loading} error={error} />
       </div>
       
       <div className="dashboard-metrics">

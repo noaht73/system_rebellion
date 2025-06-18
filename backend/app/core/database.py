@@ -42,7 +42,7 @@ def log_registered_models():
     print("REGISTERED MODELS")
     print("\n")
     for table_name in Base.metadata.tables.keys():
-        print(f"The snail Found Model: {table_name}")
+        print(f"The Meth Snail Found Model: {table_name}")
     print("\n")
 #Model Creation Funciton
 async def init_models():

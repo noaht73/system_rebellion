@@ -123,9 +123,9 @@ const CPUMetric: React.FC<CPUMetricProps> = ({
 
   // Extract CPU processes
   const cpuProcesses: CPUProcess[] = topProcesses.map((p: any) => ({
-    name: p.name || 'Unknown',
+    name: p.command || p.name || 'Unknown',
     pid: p.pid || 0,
-    cpu_percent: p.cpu_percent || 0,
+    cpu_percent: p.usage_percent || p.cpu_percent || 0,
     memory_percent: p.memory_percent || 0
   }));
 
@@ -245,15 +245,15 @@ const CPUMetric: React.FC<CPUMetricProps> = ({
         },
         processes: cpuProcesses.map((p: CPUProcess) => ({
           user: 'system',
-          command: p.name,
-          usage_percent: p.cpu_percent,
+          name: p.name,
+          cpu_percent: p.cpu_percent,
           pid: p.pid,
           memory_percent: p.memory_percent
         })),
         top_processes: cpuProcesses.map((p: CPUProcess) => ({
           user: 'system',
-          command: p.name,
-          usage_percent: p.cpu_percent,
+          name: p.name,
+          cpu_percent: p.cpu_percent,
           pid: p.pid,
           memory_percent: p.memory_percent
         })),

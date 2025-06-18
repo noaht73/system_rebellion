@@ -1,18 +1,79 @@
 // src/types/websocket.types.ts
 
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
-
-export interface WebSocketMessage {
-  type: 'cpu_metrics' | 'memory_metrics' | 'disk_metrics' | 'network_metrics' | 'error' | 'connection_established' | 'system_info' | 'all_metrics';
-  data?: any;
-  timestamp?: string;
-  message?: string;
+export enum ConnectionStatus {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  ERROR = 'error',
 }
 
+// Requests from client
+export interface AuthenticationRequest {
+  type: 'auth';
+  authenticationToken: string;
+}
+
+export interface GetMetricsRequest {
+  type: 'get_metrics';
+  requestedMetrics: Array<'cpu' | 'memory' | 'disk' | 'network'>;
+}
+
+export interface SetIntervalRequest {
+    type: 'set_interval';
+    payload: { seconds: number };
+}
+
+export interface GetSystemInfoRequest {
+    type: 'get_system_info';
+}
+
+export interface PingRequest {
+    type: 'ping';
+}
+
+export type ClientToServerMessage = AuthenticationRequest | GetMetricsRequest | SetIntervalRequest | GetSystemInfoRequest | PingRequest;
+
+// Messages from server
+export interface AllMetricsMessage {
+  type: 'all_metrics';
+  payload: Record<string, unknown>;
+}
+
+export interface CircuitBreakerMessage {
+    type: 'circuit_breaker';
+    payload: {
+        status: 'open' | 'closed' | 'half-open';
+        failures: number;
+        lastFailureTime: number | null;
+        nextRetryTime: number | null;
+    };
+}
+
+export interface WebSocketMessage {
+  type: WebSocketMessageType;
+  payload?: unknown;
+  timestamp?: string;
+}
+
+export type WebSocketMessageType =
+  | 'cpu_metrics'
+  | 'memory_metrics'
+  | 'disk_metrics'
+  | 'network_metrics'
+  | 'all_metrics'
+  | 'error'
+  | 'connection_established'
+  | 'system_info'
+  | 'auth_failed'
+  | 'auth_success'
+  | 'heartbeat'
+  | 'pong'
+  | 'circuit_breaker';
+
 export interface CircuitBreakerConfig {
-  failureThreshold: number;
-  resetTimeout: number;
-  monitoringPeriod: number;
+  maxFailures: number;
+  resetTimeoutMs: number;
+  monitoringIntervalMs: number;
 }
 
 export interface RateLimiterConfig {
@@ -27,7 +88,7 @@ export interface BackpressureConfig {
 
 export interface CircuitBreakerState {
   isOpen: boolean;
-  failures: number;
-  lastFailure: number | null;
-  nextRetry: number | null;
+  failureCount: number;
+  lastFailureTime: number | null;
+  nextRetryTime: number | null;
 }

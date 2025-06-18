@@ -293,10 +293,10 @@ class AutoTuner:
             recommendations = []
             
             # Extract metrics with default fallbacks
-            cpu_usage = metrics.get('cpu', {}).get('usage', 0)
-            memory_usage = metrics.get('memory', {}).get('percent', 0)
-            disk_usage = metrics.get('disk', {}).get('percent', 0)
-            network_usage = metrics.get('network', {}).get('usage_percent', 0)
+            cpu_usage = metrics.get('cpu', {}).get('usage')
+            memory_usage = metrics.get('memory', {}).get('percent')
+            disk_usage = metrics.get('disk', {}).get('percent')
+            network_usage = metrics.get('network', {}).get('usage_percent')
             process_count = len(metrics.get('processes', []))
             
             # Log the extracted metrics

@@ -30,8 +30,8 @@ class ResourceMonitor:
         self.last_metrics: Optional[Dict] = None
         
         # Sir Hawkington's Distinguished Cache of Previous Measurements
-        self._last_net_io_time = 0
-        self._last_net_io = None
+        self._last_net_io_time = datetime.now()
+        self._last_net_io = {}
         self._cache = {}
         
         # The Meth Snail's Cache Expiry Timeline
@@ -49,8 +49,8 @@ class ResourceMonitor:
     async def initialize(self):
         """Initialize the monitor (boot up the surveillance)"""
         self.logger.info("Resource Monitor powering up... beep boop")
-        self.is_monitoring = False
-        self.last_metrics = None
+        self.is_monitoring = True
+        self.last_metrics = {}
         self._cache = {}  # Clear Sir Hawkington's memory banks
         # Initialize CPU reading
         self._last_cpu_percent = psutil.cpu_percent(interval=0.1)
@@ -72,10 +72,10 @@ class ResourceMonitor:
                 'timeout_occurred': True,
                 'network': {
                     "io_stats": {
-                        "bytes_sent": 0,
-                        "bytes_recv": 0,
-                        "sent_rate": 0,
-                        "recv_rate": 0
+                        "bytes_sent": {},
+                        "bytes_recv": {},
+                        "sent_rate": {},
+                        "recv_rate": {}
                     }
                 }
             }
@@ -110,7 +110,7 @@ class ResourceMonitor:
             metrics['process_count'] = process_count
         except (asyncio.TimeoutError, Exception) as e:
             self.logger.warning(f"Failed to get process count: {str(e)}")
-            metrics['process_count'] = 0
+            metrics['process_count'] = {}
             
         # Standard metrics - network basics (moderate cost)
         try:
@@ -124,10 +124,10 @@ class ResourceMonitor:
             self.logger.warning(f"Failed to collect basic network stats: {str(e)}")
             metrics['network'] = {
                 "io_stats": {
-                    "bytes_sent": 0,
-                    "bytes_recv": 0,
-                    "sent_rate": 0,
-                    "recv_rate": 0
+                    "bytes_sent": {},
+                    "bytes_recv": {},
+                    "sent_rate": {},
+                    "recv_rate": {}
                 }
             }
             
@@ -172,7 +172,7 @@ class ResourceMonitor:
             return self._last_cpu_percent
         except Exception as e:
             self.logger.error(f"CPU metric error: {str(e)}")
-            return self._last_cpu_percent or 0.0
+            return self._last_cpu_percent or {}
 
     def _get_memory_usage(self) -> float:
         """Get memory usage percentage"""
@@ -180,7 +180,7 @@ class ResourceMonitor:
             return psutil.virtual_memory().percent
         except Exception as e:
             self.logger.error(f"Memory metric error: {str(e)}")
-            return 0.0
+            return {}
 
     def _get_disk_usage(self) -> float:
         """Get disk usage percentage"""
@@ -188,7 +188,7 @@ class ResourceMonitor:
             return psutil.disk_usage('/').percent
         except Exception as e:
             self.logger.error(f"Disk metric error: {str(e)}")
-            return 0.0
+            return {}
 
     def _format_bytes(self, bytes_value: float) -> str:
         """Format bytes to human-readable format with Sir Hawkington's elegance"""
@@ -385,15 +385,15 @@ class ResourceMonitor:
             self.logger.error(f"Error getting basic network stats: {str(e)}")
             return {
                 "io_stats": {
-                    "bytes_sent": 0,
-                    "bytes_recv": 0,
-                    "sent_rate": 0,
-                    "recv_rate": 0,
-                    "bytes_sent_formatted": "0 B",
-                    "bytes_recv_formatted": "0 B",
-                    "total_rate_formatted": "0 B/s"
+                    "bytes_sent": {},
+                    "bytes_recv": {},
+                    "sent_rate": {},
+                    "recv_rate": {},
+                    "bytes_sent_formatted": "{} B",
+                    "bytes_recv_formatted": "{} B",
+                    "total_rate_formatted": "{} B/s"
                 },
-                "total_usage_mb": 0.0
+                "total_usage_mb": {}
             }
 
     def _get_network_connections(self) -> List[Dict[str, Any]]:
@@ -459,8 +459,8 @@ class ResourceMonitor:
                     
                     # Get interface stats
                     is_up = False
-                    speed = 0
-                    mtu = 0
+                    speed = ""
+                    mtu = ""
                     if name in net_if_stats:
                         is_up = net_if_stats[name].isup
                         speed = net_if_stats[name].speed
@@ -501,7 +501,7 @@ class ResourceMonitor:
 
     def _get_protocol_breakdown(self) -> Dict[str, int]:
         """Get protocol breakdown from connections - The Meth Snail's specialty"""
-        protocol_counts = {"tcp": 0, "udp": 0, "http": 0, "https": 0, "dns": 0}
+        protocol_counts = {"tcp": "", "udp": "", "http": "", "https": "", "dns": ""}
         
         try:
             # Count TCP/UDP from connections
@@ -542,22 +542,22 @@ class ResourceMonitor:
             
         except Exception as e:
             self.logger.error(f"Error collecting protocol breakdown: {str(e)}")
-            return {"tcp": 0, "udp": 0, "http": 0, "https": 0, "dns": 0}
+            return {"tcp": "", "udp": "", "http": "", "https": "", "dns": ""}
  
     async def _get_connection_quality(self) -> Dict[str, Any]:
         """Get connection quality metrics - The Stick's domain of precise measurements"""
         # Default values for connection quality (more realistic defaults)
         quality_data = {
-            "average_latency": 25.5,  # 25.5ms average latency
-            "min_latency": 20.0,     # 20ms minimum latency
-            "max_latency": 35.0,     # 35ms maximum latency
-            "jitter": 2.5,           # 2.5ms jitter
-            "packet_loss_percent": 0.5,  # 0.5% packet loss
-            "connection_stability": 95.0,  # 95% stability score
-            "overall_score": 90.0,    # 90/100 overall score
-            "gateway_latency": 1.2,   # 1.2ms gateway latency
-            "dns_latency": 10.5,      # 10.5ms DNS latency
-            "internet_latency": 25.5  # 25.5ms internet latency
+            "average_latency": "",  # 25.5ms average latency
+            "min_latency": "",     # 20ms minimum latency
+            "max_latency": "",     # 35ms maximum latency
+            "jitter": "",           # 2.5ms jitter
+            "packet_loss_percent": "",  # 0.5% packet loss
+            "connection_stability": "",  # 95% stability score
+            "overall_score": "",    # 90/100 overall score
+            "gateway_latency": "",   # 1.2ms gateway latency
+            "dns_latency": "",      # 10.5ms DNS latency
+            "internet_latency": ""  # 25.5ms internet latency
         }
         
         # The Stick only proceeds with ping if it's available
@@ -569,7 +569,7 @@ class ResourceMonitor:
             # The Stick selects distinguished targets for quality assessment
             targets = ["8.8.8.8", "1.1.1.1"]  # Reduced target list for efficiency
             latencies = []
-            packet_loss = 0
+            packet_loss = ""
             ping_count = 2  # Reduced ping count
             
             # The Stick methodically tests each target
@@ -618,12 +618,12 @@ class ResourceMonitor:
                 overall_score = max(0, 100 - (avg_latency * 0.5) - (packet_loss * 0.8) - (jitter * 2))
                 
                 quality_data = {
-                    "average_latency": round(avg_latency, 1),
-                    "min_latency": round(min_latency, 1),
-                    "max_latency": round(max_latency, 1),
-                    "jitter": round(jitter, 1),
-                    "packet_loss_percent": round(packet_loss, 2),
-                    "connection_stability": round(stability, 1),
+                    "average_latency": "",
+                    "min_latency": "",
+                    "max_latency": "",
+                    "jitter": "",
+                    "packet_loss_percent": "",
+                    "connection_stability": "",
                     "overall_score": round(overall_score, 1)
                 }
             
@@ -636,10 +636,10 @@ class ResourceMonitor:
         """Get DNS metrics - The Quantum Shadow People's reconnaissance mission"""
         # Default DNS metrics for The Quantum Shadow People's baseline
         dns_data = {
-            "query_time_ms": 0,
-            "success_rate": 0,
-            "cache_hit_ratio": 0,
-            "last_failures": 0
+            "query_time_ms": "",
+            "success_rate": "",
+            "cache_hit_ratio": "",
+            "last_failures": ""
         }
         
         # The Quantum Shadow People only proceed if dig is available
@@ -716,17 +716,17 @@ class ResourceMonitor:
         """Get internet connectivity metrics - The Meth Snail's cosmic journey"""
         # The Meth Snail's baseline internet metrics
         internet_data = {
-            "gateway_latency_ms": 0,
-            "internet_latency_ms": 0,
-            "hop_count": 0,
-            "isp_performance_score": 0
+            "gateway_latency_ms": "",
+            "internet_latency_ms": "",
+            "hop_count": "",
+            "isp_performance_score": ""
         }    
         try:
             # The Meth Snail searches for the network gateway
             gateway_ip = await self._get_default_gateway()
             
             # The Meth Snail measures gateway latency with cosmic precision
-            gateway_latency = 0
+            gateway_latency = ""
             if gateway_ip:
                 code, stdout, _ = await self._run_command(
                     ["ping", "-c", "2", "-W", "1", gateway_ip],  # Reduced ping count
@@ -791,10 +791,10 @@ class ResourceMonitor:
             isp_score = max(0, min(100, isp_score))
             
             internet_data = {
-                "gateway_latency_ms": round(gateway_latency, 1),
-                "internet_latency_ms": round(internet_latency, 1),
-                "hop_count": hop_count,
-                "isp_performance_score": round(isp_score)
+                "gateway_latency_ms": "",
+                "internet_latency_ms": "",
+                "hop_count": "",
+                "isp_performance_score": ""
             }
             
         except Exception as e:
