@@ -1,5 +1,3 @@
-import { JSX } from "react/jsx-runtime";
-
 export interface DiskMetricProps {
   compact?: boolean;
   defaultTab?: 'partitions' | 'directory' | 'performance';
@@ -135,7 +133,6 @@ export interface DiskHistoryPoint {
 // Processed data structure for components
 export interface ProcessedDiskData {
   partitions: {
-    map(arg0: (partition: { mountpoint: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; percent: number; total: number; used: number; free: number; }, index: React.Key | null | undefined) => JSX.Element): import("react").ReactNode;
     items: {
       blockSize: any;
       mountPoint: string;
@@ -179,11 +176,6 @@ export interface ProcessedDiskData {
     }[];
   };
   directories: {
-    filter(arg0: (dir: { path: string; size: number; fileCount: number; lastModified: number; type?: string; cleanable?: boolean; name?: string; }) => boolean): unknown;
-    reduce // Interface type (SATA, NVMe, etc.)
-      (arg0: (sum: number, dir: { path: string; size: number; fileCount: number; lastModified: number; type?: string; cleanable?: boolean; name?: string; }) => number, arg1: number): unknown;
-    map(arg0: (dir: { path: string; size: number; fileCount: number; lastModified: number; type?: string; cleanable?: boolean; name?: string; }) => { name: string; path: string; value: number; fileCount: number; lastModified: number; type: string; cleanable: boolean; }): unknown;
-    find(arg0: (dir: { path: string; size: number; fileCount: number; lastModified: number; type?: string; cleanable?: boolean; name?: string; }) => boolean): unknown;
     largest: {
       path: string;
       size: number;

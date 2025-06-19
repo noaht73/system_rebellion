@@ -6,7 +6,7 @@ import App from './App';
 import './index.css';
 import { webSocketService } from './services/websocket/simplifiedWebSocketService';
 
-// Initialize WebSocket connection when the app loads
+// Re-enable WebSocket connection now that frontend renders
 webSocketService.connect(store.getState().auth.token);
 
 const root = createRoot(document.getElementById('root')!);

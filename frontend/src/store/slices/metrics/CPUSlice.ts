@@ -24,6 +24,29 @@ export interface CPUMetric {
   };
 }
 
+// Updated to match simplified backend CPU data structure
+export interface CPUMetric {
+  cpu_usage: any;
+  usage_percent: number;
+  physical_cores: number;
+  logical_cores: number;
+  frequency_mhz: number;
+  temperature?: number;
+  cores: number[]; // Per-core usage percentages
+  top_processes: {
+    pid: number;
+    name: string;
+    username: string;
+    cpu_percent: number;
+    memory_percent: number;
+  }[];
+  frequency_details: {
+    current: number;
+    min: number;
+    max: number;
+  };
+}
+
 export interface CPUThresholds {
   usage: {
     warning: number;
@@ -36,8 +59,8 @@ export interface CPUThresholds {
 }
 
 interface CPUState {
-  current: CPUMetric | null;
-  historical: CPUMetric[];
+  current: any | null;
+  historical: any[];
   alerts: MetricAlert[];
   thresholds: CPUThresholds;
   cpuLoading: boolean;
@@ -65,7 +88,7 @@ const initialState: CPUState = {
 };
 
 // Helper function to check CPU thresholds and generate alerts
-const checkThresholds = (metrics: CPUMetric, thresholds: CPUThresholds): MetricAlert[] => {
+const checkThresholds = (metrics: any, thresholds: CPUThresholds): MetricAlert[] => {
   const alerts: MetricAlert[] = [];
   const now = new Date().toISOString();
 

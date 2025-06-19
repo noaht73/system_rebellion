@@ -12,19 +12,19 @@ import DiskPartitionsTab from './tabs/DiskPartitionsTab';
 import { DiskDirectoryTab } from './tabs/DiskDirectoryTab';
 import { DiskPerformanceTab } from './tabs/DiskPerformanceTab';
 import { processDiskData } from './utils/diskDataProcessor';
-import { DiskMetricProps, RawDiskMetrics } from './tabs/types';
+import { DiskMetricProps, RawDiskMetrics, DiskPartition } from './tabs/types';
 import './DiskMetric.css';
 
 // Extended props to support dashboard mode
 interface ConsolidatedDiskMetricProps extends DiskMetricProps {
-  dashboardMode?: boolean; // Whether this is being used in the dashboard
+  isDashboard?: boolean; // Whether this is being used in the dashboard
   height?: number | string;
 }
 
 export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({ 
   compact = false,
   defaultTab = 'partitions',
-  dashboardMode = false,
+  isDashboard = true,
   height
 }) => {
   type TabType = 'partitions' | 'directory' | 'performance' | 'overview';
@@ -42,7 +42,7 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
   
   // Handle loading state
   if (loading) {
-    return dashboardMode ? (
+    return isDashboard ? (
       <MetricsCard title="Disk Usage" value="--" unit="%" updating={true} />
     ) : (
       <LoadingIndicator message="Fetching disk metrics..." />
@@ -51,7 +51,7 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
   
   // Handle error state
   if (error || !diskMetrics) {
-    return dashboardMode ? (
+    return isDashboard ? (
       <div className={`disk-metric ${compact ? 'compact' : ''}`} style={{ height }}>
         <MetricsCard title="Disk Usage" value="--" unit="%" status="critical" />
       </div>
@@ -68,34 +68,34 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
   console.log(' Disk Component - New backend data structure:', diskMetrics);
   
   const diskUsage = diskMetrics?.percent || 0;
-  const totalSpace = diskMetrics?.total || 0;
-  const usedSpace = diskMetrics?.used || 0;
-  const freeSpace = diskMetrics?.free || 0;
-  const readRate = diskMetrics?.read_rate || 0;
-  const writeRate = diskMetrics?.write_rate || 0;
-  const partitions = diskMetrics?.partitions || [];
-  
-  // Debug logging for the new data structure
-  console.log(' Disk Component - New backend data structure:');
-  console.log(' percent:', diskMetrics?.percent);
-  console.log(' total:', diskMetrics?.total);
-  console.log(' used:', diskMetrics?.used);
-  console.log(' free:', diskMetrics?.free);
-  console.log(' read_rate:', diskMetrics?.read_rate);
-  console.log(' write_rate:', diskMetrics?.write_rate);
-  console.log(' partitions length:', partitions.length);
-  
+
+  // Map the raw partition data to the structure expected by RawDiskMetrics
+  const mappedPartitions: DiskPartition[] = (diskMetrics?.partitions || []).map((p: any) => ({
+    mountPoint: p.mountpoint,
+    device: p.device,
+    fsType: p.fstype,
+    total: p.total,
+    used: p.used,
+    available: p.free,
+    percentUsed: p.percent,
+    // Provide default values for other fields required by the DiskPartition type
+    inodes: { total: 0, used: 0, free: 0, percentUsed: 0 },
+    health: { status: 'healthy', issues: [], errors: 0, lastCheckTime: 0 },
+    readOnly: p.opts ? p.opts.includes('ro') : false,
+    physicalDiskId: '',
+  }));
+
   // Create RawDiskMetrics structure from available metrics
   const rawDiskMetrics: RawDiskMetrics = {
-    partitions: partitions,
-    physicalDisks: [],
-    directories: partitions, // Use partitions as directories for now
+    partitions: mappedPartitions,
+    physicalDisks: [], // No data from backend for this
+    directories: [],   // No data from backend for this
     performance: {
       current: {
-        readSpeed: readRate,
-        writeSpeed: writeRate,
-        readIOPS: 0, // Not provided in current metrics
-        writeIOPS: 0, // Not provided in current metrics
+        readSpeed: diskMetrics?.read_rate || 0,
+        writeSpeed: diskMetrics?.write_rate || 0,
+        readIOPS: 0,
+        writeIOPS: 0,
         utilization: diskUsage,
         queueDepth: 0,
         latency: {
@@ -112,7 +112,7 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
       },
       topProcesses: []
     },
-    history: []
+    history: [] // No data from backend for this
   };
 
   // Process disk data once for all tabs
@@ -142,7 +142,7 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
   // If using dashboard mode, render the dashboard style
-  if (dashboardMode) {
+  if (isDashboard) {
     // Prepare partition data for pie chart
     const partitionData = processedData.partitions.items.map((partition) => ({
       name: partition.mountPoint,
@@ -192,14 +192,14 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
             </Tab>
             <Tab id="partitions" label="Partitions">
               <div className="partitions-list">
-                {processedData.partitions.map((partition: { mountpoint: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; percent: number; total: number; used: number; free: number; }, index: React.Key | null | undefined) => (
+                {processedData.partitions.items.map((partition: { mountPoint: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; percentUsed: number; total: number; used: number; available: number; }, index: React.Key | null | undefined) => (
                   <div key={index} className="partition-card">
-                    <div className="partition-name">{partition.mountpoint}</div>
-                    <div className="partition-usage">{partition.percent.toFixed(1)}%</div>
+                    <div className="partition-name">{partition.mountPoint}</div>
+                    <div className="partition-usage">{partition.percentUsed.toFixed(1)}%</div>
                     <div className="partition-details">
                       <span>Total: {formatBytes(partition.total)}</span>
                       <span>Used: {formatBytes(partition.used)}</span>
-                      <span>Free: {formatBytes(partition.free)}</span>
+                      <span>Free: {formatBytes(partition.available)}</span>
                     </div>
                   </div>
                 ))}
@@ -229,16 +229,6 @@ export const DiskMetric: React.FC<ConsolidatedDiskMetricProps> = ({
       </div>
     );
   }
-  
-  // Render compact version for dashboard if requested
-  if (compact) {
-    return (
-      <div className="disk-metric disk-metric--compact">
-        <DiskPartitionsTab data={processedData} compact={true} />
-      </div>
-    );
-  }
-  
   // Render full tabbed version for component mode
   return (
     <div className={`disk-metric ${compact ? 'compact' : ''}`}>

@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    // ... your existing config ...
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],

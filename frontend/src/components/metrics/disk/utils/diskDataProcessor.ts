@@ -225,6 +225,7 @@ const processPerformanceData = (rawData: RawDiskMetrics): ProcessedDiskData['per
     readIOPS: 0,
     writeIOPS: 0,
     utilization: 0,
+    queueDepth: 0,
     latency: { read: 0, write: 0 }
   };
   
@@ -235,6 +236,7 @@ const processPerformanceData = (rawData: RawDiskMetrics): ProcessedDiskData['per
     readIOPS: performanceCurrent.readIOPS || 0,
     writeIOPS: performanceCurrent.writeIOPS || 0,
     utilization: performanceCurrent.utilization || 0,
+    queueDepth: performanceCurrent.queueDepth || 0,
     latency: {
       read: performanceCurrent.latency?.read || 0,
       write: performanceCurrent.latency?.write || 0
@@ -248,7 +250,9 @@ const processPerformanceData = (rawData: RawDiskMetrics): ProcessedDiskData['per
     writeSpeed: [],
     readIOPS: [],
     writeIOPS: [],
-    utilization: []
+    utilization: [],
+    queueDepth: [],
+    latency: { read: [], write: [] }
   };
   
   // Process top I/O processes with safe fallbacks

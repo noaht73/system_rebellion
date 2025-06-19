@@ -34,16 +34,16 @@ metrics_backpressure: Optional[BackpressureHandler] = None
 
 def initialize_resilience_components():
     """Initializes resilience components for the WebSocket service."""
-    global circuit_breaker, backpressure_handler
+    global metrics_circuit_breaker, metrics_backpressure
     
-    circuit_breaker = get_circuit_breaker(
+    metrics_circuit_breaker = get_circuit_breaker(
         name="simplified_metrics_websocket", 
         max_failures=3,
         reset_timeout=30,
         exponential_backoff_factor=1.5
     )
 
-    backpressure_handler = get_backpressure_handler(
+    metrics_backpressure = get_backpressure_handler(
         name="simplified_metrics_backpressure",
         max_buffer_size=100,
         sampling_strategy="latest"
